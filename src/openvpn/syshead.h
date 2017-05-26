@@ -594,11 +594,11 @@ socket_defined(const socket_descriptor_t sd)
 /*
  * Should we include NTLM proxy functionality
  */
-#if defined(ENABLE_CRYPTO)
-#define NTLM 1
-#else
+//#if defined(ENABLE_CRYPTO)
+//#define NTLM 1
+//#else
 #define NTLM 0
-#endif
+//#endif
 
 /*
  * Should we include proxy digest auth functionality

@@ -320,6 +320,7 @@ int
 key_des_num_cblocks(const mbedtls_cipher_info_t *kt)
 {
     int ret = 0;
+#ifdef MBEDTLS_DES_C
     if (kt->type == MBEDTLS_CIPHER_DES_CBC)
     {
         ret = 1;
@@ -332,6 +333,7 @@ key_des_num_cblocks(const mbedtls_cipher_info_t *kt)
     {
         ret = 3;
     }
+#endif
 
     dmsg(D_CRYPTO_DEBUG, "CRYPTO INFO: n_DES_cblocks=%d", ret);
     return ret;
@@ -340,6 +342,7 @@ key_des_num_cblocks(const mbedtls_cipher_info_t *kt)
 bool
 key_des_check(uint8_t *key, int key_len, int ndc)
 {
+#ifdef MBEDTLS_DES_C
     int i;
     struct buffer b;
 
@@ -368,11 +371,15 @@ key_des_check(uint8_t *key, int key_len, int ndc)
 
 err:
     return false;
+#else
+    return true;
+#endif
 }
 
 void
 key_des_fixup(uint8_t *key, int key_len, int ndc)
 {
+#ifdef MBEDTLS_DES_C
     int i;
     struct buffer b;
 
@@ -387,6 +394,7 @@ key_des_fixup(uint8_t *key, int key_len, int ndc)
         }
         mbedtls_des_key_set_parity(key);
     }
+#endif
 }
 
 /*
@@ -698,10 +706,12 @@ cipher_des_encrypt_ecb(const unsigned char key[DES_KEY_LENGTH],
                        unsigned char *src,
                        unsigned char *dst)
 {
+#ifdef MBEDTLS_DES_C
     mbedtls_des_context ctx;
 
     ASSERT(mbed_ok(mbedtls_des_setkey_enc(&ctx, key)));
     ASSERT(mbed_ok(mbedtls_des_crypt_ecb(&ctx, src, dst)));
+#endif
 }
 
 
