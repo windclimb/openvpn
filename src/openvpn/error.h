@@ -31,6 +31,10 @@
 
 #include <assert.h>
 
+#if defined(ENABLE_NDM_INTEGRATION)
+extern char *pgmname_syslog;
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
+
 /* #define ABORT_ON_ERROR */
 
 #ifdef ENABLE_PKCS11
