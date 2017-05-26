@@ -51,6 +51,10 @@
 const char *iproute_path = IPROUTE_PATH; /* GLOBAL */
 #endif
 
+#if defined(ENABLE_NDM_INTEGRATION)
+#include "ndm.h"
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
+
 /* contains an SSEC_x value defined in misc.h */
 int script_security = SSEC_BUILT_IN; /* GLOBAL */
 
@@ -307,6 +311,33 @@ openvpn_execve(const struct argv *a, const struct env_set *es, const unsigned in
     if (a && a->argv[0])
     {
 #if defined(ENABLE_FEATURE_EXECVE)
+#if defined(ENABLE_NDM_INTEGRATION)
+        if (flags & S_SCRIPT)
+        {
+            const char *cmd = NDM_FEEDBACK_SCRIPT;
+            char *const *argv = a->argv;
+            char *const *envp = (char *const *)make_env_array(es, true, &gc);
+            pid_t pid;
+
+            pid = fork();
+            if (pid == (pid_t)0) /* child side */
+            {
+                execve(cmd, argv, envp);
+                exit(127);
+            }
+            else if (pid < (pid_t)0) /* fork failed */
+            {
+                msg(M_ERR, "openvpn_execve: unable to fork");
+            }
+            else /* parent side */
+            {
+                if (waitpid(pid, &ret, 0) != pid)
+                {
+                    ret = -1;
+                }
+            }
+        }
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
         if (openvpn_execve_allowed(flags))
         {
             const char *cmd = a->argv[0];
@@ -337,6 +368,7 @@ openvpn_execve(const struct argv *a, const struct env_set *es, const unsigned in
             msg(M_WARN, SCRIPT_SECURITY_WARNING);
             warn_shown = true;
         }
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 #else  /* if defined(ENABLE_FEATURE_EXECVE) */
         msg(M_WARN, "openvpn_execve: execve function not available");
 #endif /* if defined(ENABLE_FEATURE_EXECVE) */
