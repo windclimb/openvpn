@@ -49,6 +49,11 @@
 #include <linux/rtnetlink.h>            /* RTM_GETROUTE etc. */
 #endif
 
+#if defined(ENABLE_NDM_INTEGRATION)
+#include <ndm/feedback.h>
+#include "ndm.h"
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
+
 #ifdef _WIN32
 #include "openvpn-msg.h"
 
@@ -1554,6 +1559,42 @@ add_route(struct route_ipv4 *r,
     }
 
 #if defined(TARGET_LINUX)
+#if defined(ENABLE_NDM_INTEGRATION)
+    {
+        const char *args[] =
+        {
+            NDM_FEEDBACK_NETWORK,
+            NDM_INSTANCE_NAME,
+            NDM_ROUTE,
+            NDM_ADD,
+            NULL
+        };
+
+        if( !ndm_feedback(
+                NDM_FEEDBACK_TIMEOUT_MSEC,
+                args,
+                "%s=%s" NESEP_
+                "%s=%s" NESEP_
+                "%s=%d" NESEP_
+                "%s=%s" NESEP_
+                "%s=%s",
+                "network", network,
+                "netmask", netmask,
+                "metric",
+                    r->flags & RT_METRIC_DEFINED ?
+                        r->metric :
+                        -1,
+                "dev",
+                    is_on_link(is_local_route, flags, rgi) ?
+                        rgi->iface :
+                        "",
+                "gw", gateway
+                ) )
+        {
+            msg(M_FATAL, "Unable to communicate with NDM core (add route)");
+        }
+    }
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
     argv_printf(&argv, "%s route add %s/%d",
                 iproute_path,
@@ -1594,6 +1635,7 @@ add_route(struct route_ipv4 *r,
 #endif  /*ENABLE_IPROUTE*/
     argv_msg(D_ROUTE, &argv);
     status = openvpn_execve_check(&argv, es, 0, "ERROR: Linux route add command failed");
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 
 #elif defined (TARGET_ANDROID)
     struct buffer out = alloc_buf_gc(128, &gc);
@@ -1915,6 +1957,9 @@ add_route_ipv6(struct route_ipv6 *r6, const struct tuntap *tt, unsigned int flag
     }
 
 #if defined(TARGET_LINUX)
+#if defined(ENABLE_NDM_INTEGRATION)
+    msg(M_INFO, "IPv6 is not supported yet (add route)");
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
     argv_printf(&argv, "%s -6 route add %s/%d dev %s",
                 iproute_path,
@@ -1947,6 +1992,7 @@ add_route_ipv6(struct route_ipv6 *r6, const struct tuntap *tt, unsigned int flag
 #endif  /*ENABLE_IPROUTE*/
     argv_msg(D_ROUTE, &argv);
     status = openvpn_execve_check(&argv, es, 0, "ERROR: Linux route -6/-A inet6 add command failed");
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 
 #elif defined (TARGET_ANDROID)
     struct buffer out = alloc_buf_gc(64, &gc);
@@ -2155,6 +2201,35 @@ delete_route(struct route_ipv4 *r,
     }
 
 #if defined(TARGET_LINUX)
+#if defined(ENABLE_NDM_INTEGRATION)
+    {
+        const char *args[] =
+        {
+            NDM_FEEDBACK_NETWORK,
+            NDM_INSTANCE_NAME,
+            NDM_ROUTE,
+            NDM_DEL,
+            NULL
+        };
+
+        if( !ndm_feedback(
+                NDM_FEEDBACK_TIMEOUT_MSEC,
+                args,
+                "%s=%s" NESEP_
+                "%s=%s" NESEP_
+                "%s=%d",
+                "network", network,
+                "netmask", netmask,
+                "metric",
+                    r->flags & RT_METRIC_DEFINED ?
+                        r->metric :
+                        -1
+                ) )
+        {
+            msg(M_FATAL, "Unable to communicate with NDM core (del route)");
+        }
+    }
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
     argv_printf(&argv, "%s route del %s/%d",
                 iproute_path,
@@ -2172,6 +2247,7 @@ delete_route(struct route_ipv4 *r,
     }
     argv_msg(D_ROUTE, &argv);
     openvpn_execve_check(&argv, es, 0, "ERROR: Linux route delete command failed");
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 
 #elif defined (_WIN32)
 
@@ -2366,6 +2442,9 @@ delete_route_ipv6(const struct route_ipv6 *r6, const struct tuntap *tt, unsigned
 
 
 #if defined(TARGET_LINUX)
+#if defined(ENABLE_NDM_INTEGRATION)
+    msg(M_INFO, "IPv6 is not supported yet (add route)");
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
     argv_printf(&argv, "%s -6 route del %s/%d dev %s",
                 iproute_path,
@@ -2393,6 +2472,7 @@ delete_route_ipv6(const struct route_ipv6 *r6, const struct tuntap *tt, unsigned
 #endif  /*ENABLE_IPROUTE*/
     argv_msg(D_ROUTE, &argv);
     openvpn_execve_check(&argv, es, 0, "ERROR: Linux route -6/-A inet6 del command failed");
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 
 #elif defined (_WIN32)
 

@@ -84,7 +84,7 @@ static bool suppress_timestamps; /* GLOBAL */
 
 /* The program name passed to syslog */
 #if SYSLOG_CAPABILITY
-static char *pgmname_syslog;  /* GLOBAL */
+char *pgmname_syslog = NULL;  /* GLOBAL */
 #endif
 
 /* If non-null, messages should be written here (used for debugging only) */
@@ -465,7 +465,7 @@ open_syslog(const char *pgmname, bool stdio_to_null)
         if (!use_syslog)
         {
             pgmname_syslog = string_alloc(pgmname ? pgmname : PACKAGE, NULL);
-            openlog(pgmname_syslog, LOG_PID, LOG_OPENVPN);
+            openlog(pgmname_syslog, 0, LOG_OPENVPN);
             use_syslog = true;
 
             /* Better idea: somehow pipe stdout/stderr output to msg() */

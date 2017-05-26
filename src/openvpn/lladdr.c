@@ -12,6 +12,11 @@
 #include "error.h"
 #include "misc.h"
 
+#if defined(ENABLE_NDM_INTEGRATION)
+#include <ndm/feedback.h>
+#include "ndm.h"
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
+
 int
 set_lladdr(const char *ifname, const char *lladdr,
            const struct env_set *es)
@@ -24,6 +29,32 @@ set_lladdr(const char *ifname, const char *lladdr,
         return -1;
     }
 
+#if defined(ENABLE_NDM_INTEGRATION)
+    {
+        const char *args[] =
+        {
+            NDM_FEEDBACK_NETWORK,
+            NDM_INSTANCE_NAME,
+            NDM_LLADDR,
+            NULL
+        };
+
+        if( !ndm_feedback(
+                NDM_FEEDBACK_TIMEOUT_MSEC,
+                args,
+                "%s=%s" NESEP_
+                "%s=%s",
+                "dev", ifname,
+                "lladdr", lladdr) )
+        {
+            msg(M_FATAL, "Unable to communicate with NDM core (lladdr)");
+
+            return 1;
+        }
+
+        return 0;
+    }
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #if defined(TARGET_LINUX)
 #ifdef ENABLE_IPROUTE
     argv_printf(&argv,
@@ -69,4 +100,5 @@ set_lladdr(const char *ifname, const char *lladdr,
 
     argv_reset(&argv);
     return r;
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
 }

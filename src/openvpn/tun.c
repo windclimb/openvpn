@@ -55,6 +55,11 @@
 
 #include <string.h>
 
+#if defined(ENABLE_NDM_INTEGRATION)
+#include <ndm/feedback.h>
+#include "ndm.h"
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
+
 #ifdef _WIN32
 
 /* #define SIMULATE_DHCP_FAILED */       /* simulate bad DHCP negotiation */
@@ -932,6 +937,50 @@ do_ifconfig(struct tuntap *tt,
 
 
 #if defined(TARGET_LINUX)
+#if defined(ENABLE_NDM_INTEGRATION)
+        {
+            const char *args[] =
+            {
+                NDM_FEEDBACK_NETWORK,
+                NDM_INSTANCE_NAME,
+                NDM_IFCONFIG,
+                NDM_ADD,
+                NULL
+            };
+
+            if( !ndm_feedback(
+                    NDM_FEEDBACK_TIMEOUT_MSEC,
+                    args,
+                    "%s=%s" NESEP_
+                    "%s=%s" NESEP_
+                    "%s=%d" NESEP_
+                    "%s=%s" NESEP_
+                    "%s=%s" NESEP_
+                    "%s=%d" NESEP_
+                    "%s=%d",
+                    "dev", actual,
+                    "local", ifconfig_local,
+                    "localmask",
+                        tun ?
+                            0 :
+                            netmask_to_netbits2(tt->remote_netmask),
+                    "peer", ifconfig_remote_netmask,
+                    "broadcast",
+                        ifconfig_broadcast == NULL ?
+                            "" :
+                            ifconfig_broadcast,
+                    "is_tun", tun ? 1 : 0,
+                    "mtu", tun_mtu) )
+            {
+                msg(M_FATAL, "Unable to communicate with NDM core (ifconfig)");
+            }
+
+            if (do_ipv6)
+            {
+                msg(M_INFO, "IPv6 is not supported yet (ifconfig)");
+            }
+       }
+#else /* defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
         /*
          * Set the MTU for the device
@@ -1028,6 +1077,7 @@ do_ifconfig(struct tuntap *tt,
         tt->did_ifconfig = true;
 
 #endif /*ENABLE_IPROUTE*/
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
 #elif defined(TARGET_ANDROID)
 
         if (do_ipv6)
@@ -2109,6 +2159,27 @@ close_tun(struct tuntap *tt)
             struct argv argv = argv_new();
             struct gc_arena gc = gc_new();
 
+#if defined(ENABLE_NDM_INTEGRATION)
+        {
+            const char *args[] =
+            {
+                NDM_FEEDBACK_NETWORK,
+                NDM_INSTANCE_NAME,
+                NDM_IFCONFIG,
+                NDM_DEL,
+                NULL
+            };
+
+            if( !ndm_feedback(
+                    NDM_FEEDBACK_TIMEOUT_MSEC,
+                    args,
+                    "%s=%s",
+                    "dev", tt->actual_name) )
+            {
+                msg(M_FATAL, "Unable to communicate with NDM core (shutdown)");
+            }
+       }
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
             if (is_tun_p2p(tt))
             {
@@ -2140,11 +2211,15 @@ close_tun(struct tuntap *tt)
 
             argv_msg(M_INFO, &argv);
             openvpn_execve_check(&argv, NULL, 0, "Linux ip addr del failed");
+#endif /*if defined(ENABLE_NDM_INTEGRATION) */
 
             if (tt->did_ifconfig_ipv6_setup)
             {
                 const char *ifconfig_ipv6_local = print_in6_addr(tt->local_ipv6, 0, &gc);
 
+#if defined(ENABLE_NDM_INTEGRATION)
+                msg(M_INFO, "IPv6 is not supported yet (shutdown)");
+#else /* if defined(ENABLE_NDM_INTEGRATION) */
 #ifdef ENABLE_IPROUTE
                 argv_printf(&argv, "%s -6 addr del %s/%d dev %s",
                             iproute_path,
@@ -2165,6 +2240,7 @@ close_tun(struct tuntap *tt)
                 argv_msg(M_INFO, &argv);
                 openvpn_execve_check(&argv, NULL, 0, "Linux ifconfig inet6 del failed");
 #endif
+#endif /* if defined(ENABLE_NDM_INTEGRATION) */
             }
 
             argv_reset(&argv);

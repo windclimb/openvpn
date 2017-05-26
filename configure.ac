@@ -184,6 +184,13 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[ndm-integration],
+	[AS_HELP_STRING([--disable-ndm-integration], [disable NDM integration @<:@default=yes@:>@])],
+	,
+	[enable_ndm_integration="yes"]
+)
+
+AC_ARG_ENABLE(
 	[pf],
 	[AS_HELP_STRING([--disable-pf], [disable internal packet filter @<:@default=yes@:>@])],
 	,
@@ -1148,6 +1155,11 @@ test "${enable_port_share}" = "yes" && AC_DEFINE([ENABLE_PORT_SHARE], [1], [Enab
 test "${enable_def_auth}" = "yes" && AC_DEFINE([ENABLE_DEF_AUTH], [1], [Enable deferred authentication])
 test "${enable_pf}" = "yes" && AC_DEFINE([ENABLE_PF], [1], [Enable internal packet filter])
 test "${enable_strict_options}" = "yes" && AC_DEFINE([ENABLE_STRICT_OPTIONS_CHECK], [1], [Enable strict options check between peers])
+
+if test "${enable_ndm_integration}" = "yes"; then
+	LDFLAGS="${LDFLAGS} -lndm"
+	AC_DEFINE([ENABLE_NDM_INTEGRATION], [1], [Enable NDM integration])
+fi
 
 if test "${enable_crypto}" = "yes"; then
 	test "${have_crypto}" != "yes" && AC_MSG_ERROR([${with_crypto_library} crypto is required but missing])
