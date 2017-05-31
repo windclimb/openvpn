@@ -3129,6 +3129,7 @@ do_option_warnings(struct context *c)
     }
 #endif /* ifdef ENABLE_CRYPTO */
 
+#if !defined(ENABLE_NDM_INTEGRATION)
     /* If a script is used, print appropiate warnings */
     if (o->user_script_used)
     {
@@ -3145,6 +3146,7 @@ do_option_warnings(struct context *c)
             msg(M_WARN, "NOTE: starting with " PACKAGE_NAME " 2.1, '--script-security 2' or higher is required to call user-defined scripts or executables");
         }
     }
+#endif /* if !defined(ENABLE_NDM_INTEGRATION) */
 }
 
 static void
