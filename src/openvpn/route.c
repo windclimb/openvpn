@@ -1564,9 +1564,18 @@ add_route(struct route_ipv4 *r,
 #if defined(TARGET_LINUX)
 #if defined(ENABLE_NDM_INTEGRATION)
     {
+        char buf[1024];
+
+        memset(buf, 0, sizeof(buf));
+
+        snprintf(buf, sizeof(buf), "%s%s/%s",
+            NDM_OPENVPN_DIR,
+            NDM_INSTANCE_NAME,
+            NDM_FEEDBACK_NETWORK);
+
         const char *args[] =
         {
-            NDM_FEEDBACK_NETWORK,
+            buf,
             NDM_INSTANCE_NAME,
             NDM_ROUTE,
             NDM_ADD,
@@ -2214,9 +2223,18 @@ delete_route(struct route_ipv4 *r,
 #if defined(TARGET_LINUX)
 #if defined(ENABLE_NDM_INTEGRATION)
     {
+        char buf[1024];
+
+        memset(buf, 0, sizeof(buf));
+
+        snprintf(buf, sizeof(buf), "%s%s/%s",
+            NDM_OPENVPN_DIR,
+            NDM_INSTANCE_NAME,
+            NDM_FEEDBACK_NETWORK);
+
         const char *args[] =
         {
-            NDM_FEEDBACK_NETWORK,
+            buf,
             NDM_INSTANCE_NAME,
             NDM_ROUTE,
             NDM_DEL,
@@ -2228,9 +2246,11 @@ delete_route(struct route_ipv4 *r,
                 args,
                 "%s=%s" NESEP_
                 "%s=%s" NESEP_
+                "%s=%s" NESEP_
                 "%s=%d",
                 "network", network,
                 "netmask", netmask,
+                "gw", gateway,
                 "metric",
                     r->flags & RT_METRIC_DEFINED ?
                         r->metric :

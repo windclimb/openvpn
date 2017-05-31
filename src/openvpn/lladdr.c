@@ -31,9 +31,18 @@ set_lladdr(const char *ifname, const char *lladdr,
 
 #if defined(ENABLE_NDM_INTEGRATION)
     {
+        char buf[1024];
+
+        memset(buf, 0, sizeof(buf));
+
+        snprintf(buf, sizeof(buf), "%s%s/%s",
+            NDM_OPENVPN_DIR,
+            NDM_INSTANCE_NAME,
+            NDM_FEEDBACK_NETWORK);
+
         const char *args[] =
         {
-            NDM_FEEDBACK_NETWORK,
+            buf,
             NDM_INSTANCE_NAME,
             NDM_LLADDR,
             NULL
