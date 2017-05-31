@@ -5,8 +5,7 @@
 
 #define NDM_OPENVPN_DIR			"/tmp/openvpn/"
 
-#define NDM_FEEDBACK_SCRIPT		(NDM_OPENVPN_DIR "openvpn.script.feedback")
-#define NDM_FEEDBACK_NETWORK	(NDM_OPENVPN_DIR "openvpn.feedback")
+#define NDM_FEEDBACK_NETWORK	"network.feedback"
 
 #define NDM_INSTANCE_NAME		(pgmname_syslog == NULL ? "_ndm_null_" : pgmname_syslog)
 

@@ -938,9 +938,18 @@ do_ifconfig(struct tuntap *tt,
 #if defined(TARGET_LINUX)
 #if defined(ENABLE_NDM_INTEGRATION)
         {
+            char buf[1024];
+
+            memset(buf, 0, sizeof(buf));
+
+            snprintf(buf, sizeof(buf), "%s%s/%s",
+                NDM_OPENVPN_DIR,
+                NDM_INSTANCE_NAME,
+                NDM_FEEDBACK_NETWORK);
+
             const char *args[] =
             {
-                NDM_FEEDBACK_NETWORK,
+                buf,
                 NDM_INSTANCE_NAME,
                 NDM_IFCONFIG,
                 NDM_ADD,
@@ -956,19 +965,21 @@ do_ifconfig(struct tuntap *tt,
                     "%s=%s" NESEP_
                     "%s=%s" NESEP_
                     "%s=%d" NESEP_
+                    "%s=%d" NESEP_
                     "%s=%d",
                     "dev", actual,
                     "local", ifconfig_local,
                     "localmask",
                         tun ?
-                            0 :
+                            -1 :
                             netmask_to_netbits2(tt->remote_netmask),
                     "peer", ifconfig_remote_netmask,
                     "broadcast",
                         ifconfig_broadcast == NULL ?
                             "" :
                             ifconfig_broadcast,
-                    "is_tun", tun ? 1 : 0,
+                    "is_tun", TUNNEL_TYPE(tt) == DEV_TYPE_TUN ? 1 : 0,
+                    "is_tap", TUNNEL_TYPE(tt) == DEV_TYPE_TAP ? 1 : 0,
                     "mtu", tun_mtu) )
             {
                 msg(M_FATAL, "Unable to communicate with NDM core (ifconfig)");
@@ -2160,9 +2171,18 @@ close_tun(struct tuntap *tt)
 
 #if defined(ENABLE_NDM_INTEGRATION)
         {
+            char buf[1024];
+
+            memset(buf, 0, sizeof(buf));
+
+            snprintf(buf, sizeof(buf), "%s%s/%s",
+                NDM_OPENVPN_DIR,
+                NDM_INSTANCE_NAME,
+                NDM_FEEDBACK_NETWORK);
+
             const char *args[] =
             {
-                NDM_FEEDBACK_NETWORK,
+                buf,
                 NDM_INSTANCE_NAME,
                 NDM_IFCONFIG,
                 NDM_DEL,

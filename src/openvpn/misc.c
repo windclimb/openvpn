@@ -204,7 +204,7 @@ openvpn_execve(const struct argv *a, const struct env_set *es, const unsigned in
 #if defined(ENABLE_NDM_INTEGRATION)
         if (flags & S_SCRIPT)
         {
-            const char *cmd = NDM_FEEDBACK_SCRIPT;
+            const char *cmd = a->argv[0];
             char *const *argv = a->argv;
             char *const *envp = (char *const *)make_env_array(es, true, &gc);
             pid_t pid;
