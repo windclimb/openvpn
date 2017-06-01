@@ -4816,7 +4816,9 @@ verify_permission(const char *name,
 {
     if (!(type & allowed))
     {
-        msg(msglevel, "option '%s' cannot be used in this context (%s)", name, file);
+        int new_msglevel = (msglevel & M_FATAL) ? (M_FATAL | M_INVALIDCONFIG) : msglevel;
+
+        msg(new_msglevel, "option '%s' cannot be used in this context", name);
         return false;
     }
 
@@ -4825,7 +4827,6 @@ verify_permission(const char *name,
         *found |= type;
     }
 
-#ifndef ENABLE_SMALL
     /* Check if this options is allowed in connection block,
      * but we are currently not in a connection block
      * Parsing a connection block uses a temporary options struct without
@@ -4836,14 +4837,13 @@ verify_permission(const char *name,
     {
         if (file)
         {
-            msg(M_WARN, "Option '%s' in %s:%d is ignored by previous <connection> blocks ", name, file, line);
+            msg(M_WARN, "Option '%s' in line %d is ignored by previous <connection> blocks ", name, line);
         }
         else
         {
             msg(M_WARN, "Option '%s' is ignored by previous <connection> blocks", name);
         }
     }
-#endif
     return true;
 }
 
@@ -8232,7 +8232,7 @@ add_option(struct options *options,
     else
     {
         int i;
-        int msglevel = msglevel_fc;
+        int msglevel = M_FATAL | M_INVALIDCONFIG;
         /* Check if an option is in --ignore-unknown-option and
          * set warning level to non fatal */
         for (i = 0; options->ignore_unknown_option && options->ignore_unknown_option[i]; i++)
@@ -8243,9 +8243,10 @@ add_option(struct options *options,
                 break;
             }
         }
+
         if (file)
         {
-            msg(msglevel, "Unrecognized option or missing or extra parameter(s) in %s:%d: %s (%s)", file, line, p[0], PACKAGE_VERSION);
+            msg(msglevel, "Unrecognized option or missing or extra parameter(s) in configuration: (line %d): %s (%s)", line, p[0], PACKAGE_VERSION);
         }
         else
         {
