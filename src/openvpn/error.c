@@ -376,12 +376,16 @@ x_msg_va(const unsigned int flags, const char *format, va_list arglist)
 
     if (flags & M_FATAL)
     {
+#if SYSLOG_CAPABILITY
+        syslog(level, "Exiting due to fatal error");
+#else
         msg(M_INFO, "Exiting due to fatal error");
+#endif
     }
 
     if (flags & M_FATAL)
     {
-        openvpn_exit(OPENVPN_EXIT_STATUS_ERROR); /* exit point */
+        openvpn_exit( ((flags) & M_INVALIDCONFIG) ? OPENVPN_CONFIG_ERROR_EXITCODE_ : OPENVPN_EXIT_STATUS_ERROR); /* exit point */
 
     }
     if (flags & M_USAGE_SMALL)
