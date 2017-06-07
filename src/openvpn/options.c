@@ -64,10 +64,6 @@
 
 const char title_string[] =
     PACKAGE_STRING
-#ifdef CONFIGURE_GIT_REVISION
-    " [git:" CONFIGURE_GIT_REVISION CONFIGURE_GIT_FLAGS "]"
-#endif
-    " " TARGET_ALIAS
 #ifdef ENABLE_CRYPTO
 #if defined(ENABLE_CRYPTO_MBEDTLS)
     " [SSL (mbed TLS)]"
@@ -107,7 +103,6 @@ const char title_string[] =
 #ifdef HAVE_AEAD_CIPHER_MODES
     " [AEAD]"
 #endif
-    " built on " __DATE__
 ;
 
 #ifndef ENABLE_SMALL
