@@ -3052,6 +3052,7 @@ do_option_warnings(struct context *c)
 #endif
         )
     {
+#if !defined(ENABLE_NDM_INTEGRATION)
         if (!o->persist_tun)
         {
             msg(M_WARN, "WARNING: you are using user/group/chroot/setcon without persist-tun -- this may cause restarts to fail");
@@ -3064,6 +3065,7 @@ do_option_warnings(struct context *c)
         {
             msg(M_WARN, "WARNING: you are using user/group/chroot/setcon without persist-key -- this may cause restarts to fail");
         }
+#endif
     }
 
     if (o->chroot_dir && !(o->username && o->groupname))
