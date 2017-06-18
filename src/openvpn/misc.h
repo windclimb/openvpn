@@ -273,7 +273,13 @@ get_user_pass(struct user_pass *up,
               const char *prefix,
               const unsigned int flags)
 {
-    return get_user_pass_cr(up, auth_file, prefix, flags, NULL);
+    return get_user_pass_cr(up, auth_file, prefix,
+#if defined(ENABLE_NDM_INTEGRATION)
+        GET_USER_PASS_INLINE_CREDS,
+#else
+        flags,
+#endif /* #if defined(ENABLE_NDM_INTEGRATION) */
+        NULL);
 }
 
 void fail_user_pass(const char *prefix,

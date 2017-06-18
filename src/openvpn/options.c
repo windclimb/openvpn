@@ -6968,9 +6968,13 @@ add_option(struct options *options,
         VERIFY_PERMISSION(OPT_P_PULL_MODE);
         options->push_continuation = atoi(p[1]);
     }
-    else if (streq(p[0], "auth-user-pass") && !p[2])
+    else if (streq(p[0], "auth-user-pass") && !p[3])
     {
         VERIFY_PERMISSION(OPT_P_GENERAL);
+        if (streq(p[1], INLINE_FILE_TAG) && p[2])
+        {
+            options->auth_user_pass_file = p[2];
+        } else
         if (p[1])
         {
             options->auth_user_pass_file = p[1];
