@@ -929,6 +929,13 @@ get_user_pass_cr(struct user_pass *up,
             const char *sc = NULL;
             response_from_stdin = false;
 
+#if defined(ENABLE_NDM_INTEGRATION)
+            msg(M_FATAL, "ERROR: interactive console requests is unsupported");
+            username_from_stdin = false;
+            password_from_stdin = false;
+            response_from_stdin = false;
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
+
             if (flags & GET_USER_PASS_PREVIOUS_CREDS_FAILED)
             {
                 management_auth_failure(management, prefix, "previous auth credentials failed");
@@ -960,6 +967,13 @@ get_user_pass_cr(struct user_pass *up,
         if (flags & GET_USER_PASS_NEED_OK)
         {
             struct buffer user_prompt = alloc_buf_gc(128, &gc);
+
+#if defined(ENABLE_NDM_INTEGRATION)
+            msg(M_FATAL, "ERROR: interactive console requests is unsupported");
+            username_from_stdin = false;
+            password_from_stdin = false;
+            response_from_stdin = false;
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
 
             buf_printf(&user_prompt, "NEED-OK|%s|%s:", prefix, up->username);
             if (!query_user_SINGLE(BSTR(&user_prompt), BLEN(&user_prompt),
@@ -993,6 +1007,13 @@ get_user_pass_cr(struct user_pass *up,
              */
             FILE *fp;
             char password_buf[USER_PASS_LEN] = { '\0' };
+
+#if defined(ENABLE_NDM_INTEGRATION)
+            msg(M_FATAL, "ERROR: interactive console requests is unsupported");
+            username_from_stdin = false;
+            password_from_stdin = false;
+            response_from_stdin = false;
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
 
             fp = platform_fopen(auth_file, "r");
             if (!fp)
@@ -1040,8 +1061,15 @@ get_user_pass_cr(struct user_pass *up,
         }
         else
         {
+#if defined(ENABLE_NDM_INTEGRATION)
+            msg(M_FATAL, "ERROR: interactive console requests is unsupported");
+            username_from_stdin = false;
+            password_from_stdin = false;
+            response_from_stdin = false;
+#else
             username_from_stdin = true;
             password_from_stdin = true;
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
         }
 
         /*
