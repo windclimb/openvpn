@@ -420,7 +420,11 @@ auth_user_pass_setup(const char *auth_file, const struct static_challenge_info *
             get_user_pass_cr(&auth_user_pass,
                              auth_file,
                              UP_TYPE_AUTH,
+#if defined(ENABLE_NDM_INTEGRATION)
+                             GET_USER_PASS_INLINE_CREDS,
+#else
                              GET_USER_PASS_MANAGEMENT|GET_USER_PASS_DYNAMIC_CHALLENGE,
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
                              auth_challenge);
         }
         else if (sci) /* static challenge response */
@@ -433,7 +437,11 @@ auth_user_pass_setup(const char *auth_file, const struct static_challenge_info *
             get_user_pass_cr(&auth_user_pass,
                              auth_file,
                              UP_TYPE_AUTH,
+#if defined(ENABLE_NDM_INTEGRATION)
+                             GET_USER_PASS_INLINE_CREDS,
+#else
                              flags,
+#endif /* defined(ENABLE_NDM_INTEGRATION) */
                              sci->challenge_text);
         }
         else
