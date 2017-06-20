@@ -2334,10 +2334,12 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
         {
             msg(M_USAGE, "--inetd cannot be used with --mode server");
         }
+#if !defined(ENABLE_NDM_INTEGRATION)
         if (options->ipchange)
         {
             msg(M_USAGE, "--ipchange cannot be used with --mode server (use --client-connect instead)");
         }
+#endif
         if (!(proto_is_dgram(ce->proto) || ce->proto == PROTO_TCP_SERVER))
         {
             msg(M_USAGE, "--mode server currently only supports "
@@ -2426,6 +2428,7 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
         {
             msg(M_USAGE, "--hash-size requires --mode server");
         }
+#if !defined(ENABLE_NDM_INTEGRATION)
         if (options->learn_address_script)
         {
             msg(M_USAGE, "--learn-address requires --mode server");
@@ -2438,6 +2441,7 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
         {
             msg(M_USAGE, "--client-disconnect requires --mode server");
         }
+#endif
         if (options->client_config_dir || options->ccd_exclusive)
         {
             msg(M_USAGE, "--client-config-dir/--ccd-exclusive requires --mode server");
@@ -2476,10 +2480,12 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
                 "affect the server. To have TCP_NODELAY in both direction use "
                 "tcp-nodelay in the server configuration instead.");
         }
+#if !defined(ENABLE_NDM_INTEGRATION)
         if (options->auth_user_pass_verify_script)
         {
             msg(M_USAGE, "--auth-user-pass-verify requires --mode server");
         }
+#endif
         if (options->auth_token_generate)
         {
             msg(M_USAGE, "--auth-gen-token requires --mode server");
