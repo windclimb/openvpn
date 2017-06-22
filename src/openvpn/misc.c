@@ -1498,7 +1498,9 @@ purge_user_pass(struct user_pass *up, const bool force)
      */
     else if (!warn_shown && (!up->tokenized))
     {
-        msg(M_WARN, "WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this");
+#if !defined(ENABLE_NDM_INTEGRATION)
+        msg(M_INFO, "WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this");
+#endif /* !defined(ENABLE_NDM_INTEGRATION) */
         warn_shown = true;
     }
 }
