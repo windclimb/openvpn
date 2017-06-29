@@ -1165,12 +1165,32 @@ get_user_pass_cr(struct user_pass *up,
         else if (flags & GET_USER_PASS_INLINE_CREDS)
         {
             struct buffer buf;
-            buf_set_read(&buf, (uint8_t *) auth_file, strlen(auth_file) + 1);
-            if (!(flags & GET_USER_PASS_PASSWORD_ONLY))
+
+            if (!auth_file)
             {
-                buf_parse(&buf, '\n', up->username, USER_PASS_LEN);
+                memset(up->password, '\0', USER_PASS_LEN);
+                memset(up->username, '\0', USER_PASS_LEN);
+
+                if ((flags & GET_USER_PASS_PASSWORD_ONLY) &&
+                    (flags & GET_USER_PASS_PKCS))
+                {
+                    msg(M_WARN, "using default password \"password\" for pkcs file");
+
+                    strcpy(up->password, "password");
+                } else
+                {
+                    msg(M_WARN, "authfile is not set, using empty username and password");
+                }
+            } else
+            {
+                buf_set_read(&buf, (uint8_t *) auth_file, strlen(auth_file) + 1);
+                if (!(flags & GET_USER_PASS_PASSWORD_ONLY))
+                {
+                    buf_parse(&buf, '\n', up->username, USER_PASS_LEN);
+                }
+                buf_parse(&buf, '\n', up->password, USER_PASS_LEN);
             }
-            buf_parse(&buf, '\n', up->password, USER_PASS_LEN);
+            response_from_stdin = false;
         }
         /*
          * Read from auth file unless this is a dynamic challenge request.
