@@ -2046,6 +2046,7 @@ open_tun(const char *dev, const char *dev_type, const char *dev_node, struct tun
                 dev);
         }
 
+#if !defined(ENABLE_NDM_INTEGRATION)
         /*
          * Set an explicit name, if --dev is not tun or tap
          */
@@ -2053,6 +2054,7 @@ open_tun(const char *dev, const char *dev_type, const char *dev_node, struct tun
         {
             strncpynt(ifr.ifr_name, dev, IFNAMSIZ);
         }
+#endif /* ENABLE_NDM_INTEGRATION */
 
         /*
          * Use special ioctl that configures tun/tap device with the parms
