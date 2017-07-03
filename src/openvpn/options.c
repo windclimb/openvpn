@@ -2785,7 +2785,9 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
 #endif
         MUST_BE_UNDEF(cipher_list);
         MUST_BE_UNDEF(tls_cert_profile);
+#if !defined(ENABLE_NDM_INTEGRATION)
         MUST_BE_UNDEF(tls_verify);
+#endif
         MUST_BE_UNDEF(tls_export_cert);
         MUST_BE_UNDEF(verify_x509_name);
         MUST_BE_UNDEF(tls_timeout);
