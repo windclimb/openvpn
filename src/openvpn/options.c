@@ -2735,7 +2735,9 @@ options_postprocess_verify_ce(const struct options *options, const struct connec
         MUST_BE_UNDEF(pkcs12_file);
 #endif
         MUST_BE_UNDEF(cipher_list);
+#if !defined(ENABLE_NDM_INTEGRATION)
         MUST_BE_UNDEF(tls_verify);
+#endif
         MUST_BE_UNDEF(tls_export_cert);
         MUST_BE_UNDEF(verify_x509_name);
         MUST_BE_UNDEF(tls_timeout);
