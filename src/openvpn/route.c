@@ -996,6 +996,7 @@ redirect_default_route_to_vpn(struct route_list *rl, const struct tuntap *tt, un
         {
             msg(M_WARN, "%s VPN gateway parameter (--route-gateway or --ifconfig) is missing", err);
         }
+#if !defined(ENABLE_NDM_INTEGRATION)
         /*
          * check if a default route is defined, unless:
          * - we are connecting to a remote host in our network
@@ -1010,6 +1011,7 @@ redirect_default_route_to_vpn(struct route_list *rl, const struct tuntap *tt, un
         {
             msg(M_WARN, "%s Cannot obtain current remote host address", err);
         }
+#endif /* !defined(ENABLE_NDM_INTEGRATION) */
         else
         {
 #ifndef TARGET_ANDROID
