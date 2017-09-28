@@ -173,7 +173,9 @@ run_up_down(const char *command,
         argv_parse_cmd(&argv, command);
         argv_printf_cat(&argv, "%s %d %d %s %s %s", arg, tun_mtu, link_mtu,
                         ifconfig_local, ifconfig_remote, context);
+#if !defined(ENABLE_NDM_INTEGRATION)
         argv_msg(M_INFO, &argv);
+#endif /* if !defined(ENABLE_NDM_INTEGRATION) */
         openvpn_run_script(&argv, es, S_FATAL, "--up/--down");
         argv_reset(&argv);
     }
