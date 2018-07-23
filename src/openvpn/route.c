@@ -1568,6 +1568,8 @@ add_route(struct route_ipv4 *r,
     {
         char buf[1024];
 
+        msg(M_INFO, "preparing to add route");
+
         memset(buf, 0, sizeof(buf));
 
         snprintf(buf, sizeof(buf), "%s%s/%s",
@@ -1606,6 +1608,10 @@ add_route(struct route_ipv4 *r,
                 ) )
         {
             msg(M_FATAL, "Unable to communicate with NDM core (add route)");
+        }
+        else
+        {
+            msg(M_INFO, "add route done: '%s'", buf);
         }
     }
 #else /* if defined(ENABLE_NDM_INTEGRATION) */

@@ -942,6 +942,8 @@ do_ifconfig(struct tuntap *tt,
         {
             char buf[1024];
 
+            msg(M_INFO, "prepare ifconfig");
+
             memset(buf, 0, sizeof(buf));
 
             snprintf(buf, sizeof(buf), "%s%s/%s",
@@ -957,6 +959,8 @@ do_ifconfig(struct tuntap *tt,
                 NDM_ADD,
                 NULL
             };
+
+            msg(M_INFO, "run ifconfig");
 
             if( !ndm_feedback(
                     NDM_FEEDBACK_TIMEOUT_MSEC,
@@ -985,6 +989,11 @@ do_ifconfig(struct tuntap *tt,
                     "mtu", tun_mtu) )
             {
                 msg(M_FATAL, "Unable to communicate with NDM core (ifconfig)");
+            }
+            else
+            {
+                msg(M_INFO, "ifconfig done: '%s'", buf);
+                tt->did_ifconfig = true;
             }
 
             if (do_ipv6)
@@ -2177,6 +2186,8 @@ close_tun(struct tuntap *tt)
         {
             char buf[1024];
 
+            msg(M_INFO, "prepare to deconfig");
+
             memset(buf, 0, sizeof(buf));
 
             snprintf(buf, sizeof(buf), "%s%s/%s",
@@ -2193,6 +2204,8 @@ close_tun(struct tuntap *tt)
                 NULL
             };
 
+            msg(M_INFO, "deconfig started");
+
             if( !ndm_feedback(
                     NDM_FEEDBACK_TIMEOUT_MSEC,
                     args,
@@ -2200,6 +2213,10 @@ close_tun(struct tuntap *tt)
                     "dev", tt->actual_name) )
             {
                 msg(M_FATAL, "Unable to communicate with NDM core (shutdown)");
+            }
+            else
+            {
+                msg(M_INFO, "deconfig done: '%s'", buf);
             }
        }
 #else /* if defined(ENABLE_NDM_INTEGRATION) */
