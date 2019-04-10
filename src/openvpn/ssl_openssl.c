@@ -1744,12 +1744,14 @@ print_details(struct key_state_ssl *ks_ssl, const char *prefix)
                 openvpn_snprintf(s2, sizeof(s2), ", %d bit RSA",
                                  RSA_bits(rsa));
             }
+#ifndef OPENSSL_NO_DSA
             else if ((EVP_PKEY_id(pkey) == EVP_PKEY_DSA) && (EVP_PKEY_get0_DSA(pkey) != NULL))
             {
                 DSA *dsa = EVP_PKEY_get0_DSA(pkey);
                 openvpn_snprintf(s2, sizeof(s2), ", %d bit DSA",
                                  DSA_bits(dsa));
             }
+#endif
 #ifndef OPENSSL_NO_EC
             else if ((EVP_PKEY_id(pkey) == EVP_PKEY_EC) && (EVP_PKEY_get0_EC_KEY(pkey) != NULL))
             {

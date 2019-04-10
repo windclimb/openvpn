@@ -272,7 +272,7 @@ EVP_PKEY_id(const EVP_PKEY *pkey)
 }
 #endif
 
-#if !defined(HAVE_EVP_PKEY_GET0_DSA)
+#if !defined(HAVE_EVP_PKEY_GET0_DSA) && !defined(OPENSSL_NO_DSA)
 /**
  * Get the DSA object of a public key
  *
@@ -386,7 +386,7 @@ RSA_bits(const RSA *rsa)
 }
 #endif
 
-#if !defined(HAVE_DSA_GET0_PQG)
+#if !defined(HAVE_DSA_GET0_PQG) && !defined(OPENSSL_NO_DSA)
 /**
  * Get the DSA parameters
  *
@@ -414,7 +414,7 @@ DSA_get0_pqg(const DSA *dsa, const BIGNUM **p,
 }
 #endif
 
-#if !defined(HAVE_DSA_BITS)
+#if !defined(HAVE_DSA_BITS) && !defined(OPENSSL_NO_DSA)
 /**
  * Number of significant DSA bits
  *
