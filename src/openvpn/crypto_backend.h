@@ -292,6 +292,7 @@ bool cipher_kt_mode_ofb_cfb(const cipher_kt_t *cipher);
  */
 bool cipher_kt_mode_aead(const cipher_kt_t *cipher);
 
+bool cipher_kt_insecure(const cipher_kt_t *cipher);
 
 /**
  *
