@@ -3267,6 +3267,7 @@ do_init_socket_1(struct context *c, const int mode)
                             c->options.ce.local_port,
                             c->options.ce.remote,
                             c->options.ce.remote_port,
+                            c->options.bindtodevice,
                             c->c1.dns_cache,
                             c->options.ce.proto,
                             c->options.ce.af,

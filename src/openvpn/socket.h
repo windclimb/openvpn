@@ -185,6 +185,7 @@ struct link_socket
     const char *remote_port;
     const char *local_host;
     const char *local_port;
+    const char *bindtodevice;
     struct cached_dns_entry *dns_cache;
     bool bind_local;
 
@@ -303,6 +304,7 @@ link_socket_init_phase1(struct link_socket *sock,
                         const char *local_port,
                         const char *remote_host,
                         const char *remote_port,
+                        const char *bindtodevice,
                         struct cached_dns_entry *dns_cache,
                         int proto,
                         sa_family_t af,
