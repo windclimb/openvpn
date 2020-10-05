@@ -1255,13 +1255,15 @@ else
 	enable_plugin_down_root="no"
 fi
 
-if test "${enable_iproute2}" = "yes"; then
-	test -z "${IPROUTE}" && AC_MSG_ERROR([ip utility is required but missing])
-	AC_DEFINE([ENABLE_IPROUTE], [1], [enable iproute2 support])
-else
-	if test "${WIN32}" != "yes"; then
-		test -z "${ROUTE}" && AC_MSG_ERROR([route utility is required but missing])
-		test -z "${IFCONFIG}" && AC_MSG_ERROR([ifconfig utility is required but missing])
+if test "${enable_ndm_integration}" != "yes"; then
+	if test "${enable_iproute2}" = "yes"; then
+		test -z "${IPROUTE}" && AC_MSG_ERROR([ip utility is required but missing])
+		AC_DEFINE([ENABLE_IPROUTE], [1], [enable iproute2 support])
+	else
+		if test "${WIN32}" != "yes"; then
+			test -z "${ROUTE}" && AC_MSG_ERROR([route utility is required but missing])
+			test -z "${IFCONFIG}" && AC_MSG_ERROR([ifconfig utility is required but missing])
+		fi
 	fi
 fi
 
