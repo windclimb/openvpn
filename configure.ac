@@ -792,6 +792,12 @@ if test -z "${LIBPAM_LIBS}"; then
 	)
 fi
 
+PKG_CHECK_MODULES(LIBNL, libnl-tiny >= 2.0, [have_libnl=yes], [have_libnl=no])
+if (test "${have_libnl}" = "yes"); then
+	CFLAGS="$CFLAGS $LIBNL_CFLAGS"
+	LIBS="$LIBS $LIBNL_LIBS"
+fi
+
 case "${with_mem_check}" in
 	valgrind)
 		AC_CHECK_HEADERS(
