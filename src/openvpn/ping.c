@@ -92,7 +92,7 @@ check_ping_send_dowork(struct context *c)
      * We will treat the ping like any other outgoing packet,
      * encrypt, sign, etc.
      */
-    encrypt_sign(c, true);
+    //encrypt_sign(c, true);
     /* Set length to 0, so it won't be counted as activity */
     c->c2.buf.len = 0;
     dmsg(D_PING, "SENT PING");

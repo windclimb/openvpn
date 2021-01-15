@@ -50,6 +50,8 @@
 #include "tls_crypt.h"
 #include "forward-inline.h"
 
+#include "netlink.h"
+
 #include "memdbg.h"
 
 #include "occ-inline.h"
@@ -89,6 +91,8 @@ context_clear_all_except_first_time(struct context *c)
     const bool first_time_save = c->first_time;
     const struct context_persist cpsave = c->persist;
     context_clear(c);
+    if (!first_time_save)
+		netlink_dco_cleanup_context(c);
     c->first_time = first_time_save;
     c->persist = cpsave;
 }

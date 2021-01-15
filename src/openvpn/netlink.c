@@ -5,6 +5,8 @@
 #endif
 
 #include "syshead.h"
+#include "openvpn.h"
+#include "ping.h"
 
 #include <linux/socket.h>
 #include <sys/types.h>
@@ -29,6 +31,7 @@ struct nl_ctx {
 	struct nl_sock *nl_sock;
 	struct nl_msg *nl_msg;
 	struct nl_cb *nl_cb;
+	struct context *c;
 
 	int ovpn_dco_id;
 };
@@ -45,7 +48,7 @@ static struct nl_ctx *nl_ctx_alloc(struct ovpn_ctx *ovpn,
 
 	ctx->nl_sock = nl_socket_alloc();
 	if (!ctx->nl_sock) {
-		fprintf(stderr, "cannot allocate netlink socket\n");
+		msg(D_HANDSHAKE, "cannot allocate netlink socket");
 		goto err_free;
 	}
 
@@ -53,27 +56,27 @@ static struct nl_ctx *nl_ctx_alloc(struct ovpn_ctx *ovpn,
 
 	ret = genl_connect(ctx->nl_sock);
 	if (ret) {
-		fprintf(stderr, "cannot connect to generic netlink: %s\n",
+		msg(D_HANDSHAKE, "cannot connect to generic netlink: %s",
 			nl_geterror(ret));
 		goto err_sock;
 	}
 
 	ctx->ovpn_dco_id = genl_ctrl_resolve(ctx->nl_sock, OVPN_NL_NAME);
 	if (ctx->ovpn_dco_id < 0) {
-		fprintf(stderr, "cannot find ovpn_dco netlink component: %d\n",
+		msg(D_HANDSHAKE, "cannot find ovpn_dco netlink component: %d",
 			ctx->ovpn_dco_id);
 		goto err_free;
 	}
 
 	ctx->nl_msg = nlmsg_alloc();
 	if (!ctx->nl_msg) {
-		fprintf(stderr, "cannot allocate netlink message\n");
+		msg(D_HANDSHAKE, "cannot allocate netlink message");
 		goto err_sock;
 	}
 
 	ctx->nl_cb = nl_cb_alloc(NL_CB_DEFAULT);
 	if (!ctx->nl_cb) {
-		fprintf(stderr, "failed to allocate netlink callback\n");
+		msg(D_HANDSHAKE, "failed to allocate netlink callback");
 		goto err_msg;
 	}
 
@@ -128,19 +131,19 @@ static int ovpn_nl_recvmsgs(struct nl_ctx *ctx)
 
 	switch (ret) {
 	case -NLE_INTR:
-		fprintf(stderr,
-			"netlink received interrupt due to signal - ignoring\n");
+		msg(D_HANDSHAKE,
+			"netlink received interrupt due to signal - ignoring");
 		break;
 	case -NLE_NOMEM:
-		fprintf(stderr, "netlink out of memory error\n");
+		msg(D_HANDSHAKE, "netlink out of memory error");
 		break;
 	case -NLE_AGAIN:
-		fprintf(stderr,
-			"netlink reports blocking read - aborting wait\n");
+		msg(D_HANDSHAKE,
+			"netlink reports blocking read - aborting wait");
 		break;
 	default:
 		if (ret)
-			fprintf(stderr, "netlink reports error (%d): %s\n",
+			msg(D_HANDSHAKE, "netlink reports error (%d): %s",
 				ret, nl_geterror(-ret));
 		break;
 	}
@@ -167,7 +170,30 @@ static int ovpn_nl_msg_send(struct nl_ctx *ctx, ovpn_nl_cb cb)
 		ovpn_nl_recvmsgs(ctx);
 
 	if (status < 0)
-		fprintf(stderr, "failed to send netlink message: %s (%d)\n",
+		msg(D_HANDSHAKE, "failed to send netlink message: %s (%d)",
+			strerror(-status), status);
+
+	return status;
+}
+
+static int ovpn_nl_process_queue(struct nl_ctx *ctx, ovpn_nl_cb cb)
+{
+	int status = 1;
+
+	nl_cb_err(ctx->nl_cb, NL_CB_CUSTOM, ovpn_nl_cb_error, &status);
+	nl_cb_set(ctx->nl_cb, NL_CB_FINISH, NL_CB_CUSTOM, ovpn_nl_cb_finish,
+		  &status);
+	nl_cb_set(ctx->nl_cb, NL_CB_ACK, NL_CB_CUSTOM, ovpn_nl_cb_finish,
+		  &status);
+
+	if (cb)
+		nl_cb_set(ctx->nl_cb, NL_CB_VALID, NL_CB_CUSTOM, cb, ctx);
+
+	while (status == 1)
+		ovpn_nl_recvmsgs(ctx);
+
+	if (status < 0)
+		msg(D_HANDSHAKE, "failed to send netlink message: %s (%d)",
 			strerror(-status), status);
 
 	return status;
@@ -218,6 +244,30 @@ nla_put_failure:
 	return 0;
 }
 
+int netlink_dco_set_peer(struct ovpn_ctx *ovpn)
+{
+	msg(D_HANDSHAKE, "set peer");
+
+	struct nl_ctx *ctx;
+	int ret = -1;
+
+	ctx = nl_ctx_alloc(ovpn, OVPN_CMD_SET_PEER);
+	if (!ctx)
+		return -ENOMEM;
+
+	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_KEEPALIVE_INTERVAL,
+		    ovpn->keepalive_interval);
+	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_KEEPALIVE_TIMEOUT,
+		    ovpn->keepalive_timeout);
+
+	ret = ovpn_nl_msg_send(ctx, NULL);
+
+	msg(D_HANDSHAKE, "set peer ok");
+nla_put_failure:
+	nl_ctx_free(ctx);
+	return ret;
+}
+
 int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uint16_t key_id)
 {
 	msg(D_HANDSHAKE, "new key");
@@ -251,4 +301,109 @@ nla_put_failure:
 	nl_ctx_free(ctx);
 
 	return 0;
+}
+
+static int netlink_dco_handle_packet(struct nl_msg *msg, void *arg)
+{
+	struct nl_ctx *ctx = (struct nl_ctx *)arg;
+	struct context *c = ctx->c;
+	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+	struct nlattr *attrs[OVPN_ATTR_MAX + 1];
+	const __u8 *data;
+	size_t len;
+
+	msg(D_HANDSHAKE, "received message");
+
+	nla_parse(attrs, OVPN_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
+		  genlmsg_attrlen(gnlh, 0), NULL);
+
+	if (!attrs[OVPN_ATTR_PACKET]) {
+		msg(D_HANDSHAKE, "no packet content in netlink message");
+		return NL_SKIP;
+	}
+
+	len = nla_len(attrs[OVPN_ATTR_PACKET]);
+	data = nla_data(attrs[OVPN_ATTR_PACKET]);
+
+	if (memcmp(data, ping_string, PING_STRING_SIZE) == 0) {
+		msg(D_HANDSHAKE, "got ping");
+
+        /* reset packet received timer */
+        if (c->options.ping_rec_timeout)
+        {
+            event_timeout_reset(&c->c2.ping_rec_interval);
+        }
+
+        /* reset packet send timer */
+        if (c->options.ping_send_timeout)
+        {
+            event_timeout_reset(&c->c2.ping_send_interval);
+        }
+
+        /* increment authenticated receive byte count */
+        c->c2.link_read_bytes_auth += c->c2.buf.len;
+
+	}
+
+	struct gc_arena gc = gc_new();
+
+    msg(D_HANDSHAKE, "from dco: %s",
+         format_hex(data, len, 80, &gc));
+
+	gc_free(&gc);
+
+	return NL_SKIP;
+}
+
+static int nl_seq_check(struct nl_msg *msg, void *arg)
+{
+	return NL_OK;
+}
+
+void *netlink_dco_register(struct ovpn_ctx *ovpn, struct context *c)
+{
+	struct nl_ctx *ctx;
+	int ret;
+
+	ctx = nl_ctx_alloc(ovpn, OVPN_CMD_REGISTER_PACKET);
+	if (!ctx)
+		return NULL;
+
+	nl_cb_set(ctx->nl_cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, nl_seq_check,
+		  NULL);
+
+	ctx->c = c;
+
+	ret = ovpn_nl_msg_send(ctx, netlink_dco_handle_packet);
+	if (ret < 0) {
+		nl_ctx_free(ctx);
+		return NULL;
+	}
+
+	ret = nl_socket_set_nonblocking(ctx->nl_sock);
+	if (ret < 0) {
+		nl_ctx_free(ctx);
+		return NULL;
+	}
+
+	return ctx;
+}
+
+void netlink_dco_cleanup_context(struct context *c)
+{
+	if (c->c2.nl_dco_ctx == NULL)
+		return;
+
+	nl_ctx_free((struct nl_ctx *)c->c2.nl_dco_ctx);
+}
+
+void netlink_dco_process(struct context *c)
+{
+	if (c->c2.nl_dco_ctx == NULL)
+		return;
+
+	msg(D_HANDSHAKE, "process nlqueue");
+
+	ovpn_nl_process_queue((struct nl_ctx *)c->c2.nl_dco_ctx,
+		netlink_dco_handle_packet);
 }

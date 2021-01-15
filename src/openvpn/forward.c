@@ -40,6 +40,8 @@
 #include "common.h"
 #include "ssl_verify.h"
 
+#include "netlink.h"
+
 #include "memdbg.h"
 
 #include "forward-inline.h"
@@ -1873,4 +1875,8 @@ process_io(struct context *c)
             process_incoming_tun(c);
         }
     }
+    else if (!IS_SIG(c))
+    {
+		netlink_dco_process(c);
+	}
 }

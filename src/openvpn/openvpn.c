@@ -35,6 +35,8 @@
 #include "win32.h"
 #include "platform.h"
 
+#include "netlink.h"
+
 #include "memdbg.h"
 
 #include "forward-inline.h"
@@ -111,6 +113,7 @@ tunnel_point_to_point(struct context *c)
         if (c->c2.event_set_status == ES_TIMEOUT)
         {
             perf_pop();
+            netlink_dco_process(c);
             continue;
         }
 

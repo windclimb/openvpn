@@ -491,6 +491,9 @@ struct context_2
 #ifdef ENABLE_ASYNC_PUSH
     int inotify_fd; /* descriptor for monitoring file changes */
 #endif
+
+
+	void *nl_dco_ctx;
 };
 
 

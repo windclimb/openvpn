@@ -1925,9 +1925,6 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 		goto exit;
 	}
 
-
-	ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
-
 	memcpy(ovpn.key_enc, &key2.keys[kds.out_key].cipher, key_type->cipher_length);
 	memcpy(ovpn.key_dec, &key2.keys[kds.in_key].cipher, key_type->cipher_length);
 
@@ -1940,8 +1937,19 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 	if (netlink_dco_new_peer(&ovpn))
 		goto exit;
 
+    if (c->options.ping_send_timeout && c->options.ping_rec_timeout)
+    {
+		ovpn.keepalive_interval = c->options.ping_send_timeout;
+		ovpn.keepalive_timeout = c->options.ping_rec_timeout;
+
+		if (netlink_dco_set_peer(&ovpn))
+			goto exit;
+    }
+
 	if (netlink_dco_new_key(&ovpn, c->c2.tls_multi ? c->c2.tls_multi->peer_id : 0, ks->key_id))
 		goto exit;
+
+	c->c2.nl_dco_ctx = netlink_dco_register(&ovpn, c);
 
     ret = true;
 
