@@ -277,7 +277,7 @@ incoming_push_message(struct context *c, const struct buffer *buffer)
             struct tls_session *session = &c->c2.tls_multi->session[TM_ACTIVE];
             /* Do not regenerate keys if client send a second push request */
             if (!session->key[KS_PRIMARY].crypto_options.key_ctx_bi.initialized
-                && !tls_session_update_crypto_params(session, &c->options,
+                && !tls_session_update_crypto_params(c, session, &c->options,
                                                      &c->c2.frame))
             {
                 msg(D_TLS_ERRORS, "TLS Error: initializing data channel failed");

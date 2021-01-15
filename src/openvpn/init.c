@@ -2267,7 +2267,7 @@ do_deferred_options(struct context *c, const unsigned int found)
         }
         /* Do not regenerate keys if server sends an extra push reply */
         if (!session->key[KS_PRIMARY].crypto_options.key_ctx_bi.initialized
-            && !tls_session_update_crypto_params(session, &c->options, &c->c2.frame))
+            && !tls_session_update_crypto_params(c, session, &c->options, &c->c2.frame))
         {
             msg(D_TLS_ERRORS, "OPTIONS ERROR: failed to import crypto options");
             return false;
@@ -2506,7 +2506,7 @@ do_init_crypto_static(struct context *c, const unsigned int flags)
                       options->keysize, options->test_crypto, true);
 
         /* Read cipher and hmac keys from shared secret file */
-        crypto_read_openvpn_key(&c->c1.ks.key_type, &c->c1.ks.static_key,
+        crypto_read_openvpn_key(c, &c->c1.ks.key_type, &c->c1.ks.static_key,
                                 options->shared_secret_file,
                                 options->shared_secret_file_inline,
                                 options->key_direction, "Static Key Encryption",
@@ -2596,7 +2596,7 @@ do_init_crypto_tls_c1(struct context *c)
                     "algorithm specified ('%s')", options->authname);
             }
 
-            crypto_read_openvpn_key(&c->c1.ks.tls_auth_key_type,
+            crypto_read_openvpn_key(c, &c->c1.ks.tls_auth_key_type,
                                     &c->c1.ks.tls_wrap_key, options->tls_auth_file,
                                     options->tls_auth_file_inline, options->key_direction,
                                     "Control Channel Authentication", "tls-auth");
@@ -2605,7 +2605,7 @@ do_init_crypto_tls_c1(struct context *c)
         /* TLS handshake encryption+authentication (--tls-crypt) */
         if (options->tls_crypt_file)
         {
-            tls_crypt_init_key(&c->c1.ks.tls_wrap_key, options->tls_crypt_file,
+            tls_crypt_init_key(c, &c->c1.ks.tls_wrap_key, options->tls_crypt_file,
                                options->tls_crypt_inline, options->tls_server);
         }
 

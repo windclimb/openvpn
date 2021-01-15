@@ -96,7 +96,7 @@ check_tls_dowork(struct context *c)
     if (interval_test(&c->c2.tmp_int))
     {
         const int tmp_status = tls_multi_process
-                                   (c->c2.tls_multi, &c->c2.to_link, &c->c2.to_link_addr,
+                                   (c, c->c2.tls_multi, &c->c2.to_link, &c->c2.to_link_addr,
                                    get_link_socket_info(c), &wakeup);
         if (tmp_status == TLSMP_ACTIVE)
         {
@@ -830,7 +830,7 @@ process_incoming_link_part1(struct context *c, struct link_socket_info *lsi, boo
         fprintf(stderr, "R");
     }
 #endif
-    msg(D_LINK_RW, "%s READ [%d] from %s: %s",
+    msg(D_HANDSHAKE, "%s READ [%d] from %s: %s",
         proto2ascii(lsi->proto, lsi->af, true),
         BLEN(&c->c2.buf),
         print_link_socket_actual(&c->c2.from, &gc),
@@ -855,6 +855,7 @@ process_incoming_link_part1(struct context *c, struct link_socket_info *lsi, boo
 #ifdef ENABLE_CRYPTO
         if (c->c2.tls_multi)
         {
+			msg(D_HANDSHAKE, "MULTI!");
             /*
              * If tls_pre_decrypt returns true, it means the incoming
              * packet was a good TLS control channel packet.  If so, TLS code
@@ -886,6 +887,7 @@ process_incoming_link_part1(struct context *c, struct link_socket_info *lsi, boo
         }
         else
         {
+			msg(D_HANDSHAKE, "NOT MULTI");
             co = &c->c2.crypto_options;
         }
 #if P2MP_SERVER
@@ -912,6 +914,12 @@ process_incoming_link_part1(struct context *c, struct link_socket_info *lsi, boo
 #else /* ENABLE_CRYPTO */
         decrypt_status = true;
 #endif /* ENABLE_CRYPTO */
+
+
+
+    msg(D_HANDSHAKE, "LINKP1: %s",
+         format_hex(BPTR(&c->c2.buf), BLEN(&c->c2.buf), 80, &gc));
+
     }
     else
     {
@@ -930,6 +938,7 @@ process_incoming_link_part2(struct context *c, struct link_socket_info *lsi, con
 #ifdef ENABLE_FRAGMENT
         if (c->c2.fragment)
         {
+			msg(D_HANDSHAKE, "fragment");
             fragment_incoming(c->c2.fragment, &c->c2.buf, &c->c2.frame_fragment);
         }
 #endif
@@ -938,9 +947,16 @@ process_incoming_link_part2(struct context *c, struct link_socket_info *lsi, con
         /* decompress the incoming packet */
         if (c->c2.comp_context)
         {
+			msg(D_HANDSHAKE, "compress");
             (*c->c2.comp_context->alg.decompress)(&c->c2.buf, c->c2.buffers->decompress_buf, c->c2.comp_context, &c->c2.frame);
         }
 #endif
+
+	 struct gc_arena gc = gc_new();
+
+    msg(D_HANDSHAKE, "LINKP2A: %s",
+         format_hex(BPTR(&c->c2.buf), BLEN(&c->c2.buf), 80, &gc));
+          
 
 #ifdef PACKET_TRUNCATION_CHECK
         /* if (c->c2.buf.len > 1) --c->c2.buf.len; */
@@ -950,6 +966,11 @@ process_incoming_link_part2(struct context *c, struct link_socket_info *lsi, con
                                 "POST_DECRYPT",
                                 &c->c2.n_trunc_post_decrypt);
 #endif
+
+    msg(D_HANDSHAKE, "LINKP2B: %s",
+         format_hex(BPTR(&c->c2.buf), BLEN(&c->c2.buf), 80, &gc));
+
+gc_free(&gc);
 
         /*
          * Set our "official" outgoing address, since
@@ -981,7 +1002,7 @@ process_incoming_link_part2(struct context *c, struct link_socket_info *lsi, con
         /* Did we just receive an openvpn ping packet? */
         if (is_ping_msg(&c->c2.buf))
         {
-            dmsg(D_PING, "RECEIVED PING PACKET");
+            msg(D_HANDSHAKE, "RECEIVED PING PACKET");
             c->c2.buf.len = 0; /* drop packet */
         }
 

@@ -45,6 +45,8 @@
 #include "ssl_common.h"
 #include "ssl_backend.h"
 
+struct context;
+
 /* Used in the TLS PRF function */
 #define KEY_EXPANSION_ID "OpenVPN"
 
@@ -236,7 +238,7 @@ void tls_multi_free(struct tls_multi *multi, bool clear);
  * Basically decides if we should call tls_process for
  * the active or untrusted sessions.
  */
-int tls_multi_process(struct tls_multi *multi,
+int tls_multi_process(struct context* c, struct tls_multi *multi,
                       struct buffer *to_link,
                       struct link_socket_actual **to_link_addr,
                       struct link_socket_info *to_link_socket_info,
@@ -480,7 +482,7 @@ void tls_update_remote_addr(struct tls_multi *multi,
  *
  * @return true if updating succeeded, false otherwise.
  */
-bool tls_session_update_crypto_params(struct tls_session *session,
+bool tls_session_update_crypto_params(struct context *c, struct tls_session *session,
                                       struct options *options, struct frame *frame);
 
 /**

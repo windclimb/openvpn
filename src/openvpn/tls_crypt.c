@@ -66,7 +66,7 @@ tls_crypt_buf_overhead(void)
 }
 
 void
-tls_crypt_init_key(struct key_ctx_bi *key, const char *key_file,
+tls_crypt_init_key(struct context* c, struct key_ctx_bi *key, const char *key_file,
                    const char *key_inline, bool tls_server)
 {
     const int key_direction = tls_server ?
@@ -76,7 +76,7 @@ tls_crypt_init_key(struct key_ctx_bi *key, const char *key_file,
     {
         msg (M_FATAL, "ERROR: --tls-crypt not supported");
     }
-    crypto_read_openvpn_key(&kt, key, key_file, key_inline, key_direction,
+    crypto_read_openvpn_key(c, &kt, key, key_file, key_inline, key_direction,
                             "Control Channel Encryption", "tls-crypt");
 }
 
@@ -105,7 +105,7 @@ tls_crypt_wrap(const struct buffer *src, struct buffer *dst,
 
     gc_init(&gc);
 
-    dmsg(D_PACKET_CONTENT, "TLS-CRYPT WRAP FROM: %s",
+    msg(D_HANDSHAKE, "TLS-CRYPT WRAP FROM: %s",
          format_hex(BPTR(src), BLEN(src), 80, &gc));
 
     /* Get packet ID */
@@ -183,7 +183,7 @@ tls_crypt_unwrap(const struct buffer *src, struct buffer *dst,
     ASSERT(packet_id_initialized(&opt->packet_id)
            || (opt->flags & CO_IGNORE_PACKET_ID));
 
-    dmsg(D_PACKET_CONTENT, "TLS-CRYPT UNWRAP FROM: %s",
+    msg(D_HANDSHAKE, "TLS-CRYPT UNWRAP FROM: %s",
          format_hex(BPTR(src), BLEN(src), 80, &gc));
 
     if (buf_len(src) < TLS_CRYPT_OFF_CT)

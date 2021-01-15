@@ -32,6 +32,8 @@
 
 #ifdef ENABLE_CRYPTO
 
+#include "openvpn.h"
+
 #include "crypto.h"
 #include "error.h"
 #include "integer.h"
@@ -389,7 +391,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
     ASSERT(ctx->cipher);
     ASSERT(cipher_kt_mode_aead(cipher_kt));
 
-    dmsg(D_PACKET_CONTENT, "DECRYPT FROM: %s",
+    msg(D_HANDSHAKE, "DECRYPT FROM: %s",
          format_hex(BPTR(buf), BLEN(buf), 80, &gc));
 
     ASSERT(ad_start >= buf->data && ad_start <= BPTR(buf));
@@ -415,7 +417,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
         memcpy(iv, BPTR(buf), packet_iv_len);
         memcpy(iv + packet_iv_len, ctx->implicit_iv, ctx->implicit_iv_len);
 
-        dmsg(D_PACKET_CONTENT, "DECRYPT IV: %s", format_hex(iv, iv_len, 0, &gc));
+        msg(D_HANDSHAKE, "DECRYPT IV: %s", format_hex(iv, iv_len, 0, &gc));
 
         /* Load IV, ctx->cipher was already initialized with key & keylen */
         if (!cipher_ctx_reset(ctx->cipher, iv))
@@ -438,7 +440,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
     }
     tag_ptr = BPTR(buf);
     ASSERT(buf_advance(buf, tag_size));
-    dmsg(D_PACKET_CONTENT, "DECRYPT MAC: %s", format_hex(tag_ptr, tag_size, 0, &gc));
+    msg(D_HANDSHAKE, "DECRYPT MAC: %s", format_hex(tag_ptr, tag_size, 0, &gc));
 #if defined(ENABLE_CRYPTO_OPENSSL) && OPENSSL_VERSION_NUMBER < 0x10001040L
     /* OpenSSL <= 1.0.1c bug requires set tag before processing ciphertext */
     if (!EVP_CIPHER_CTX_ctrl(ctx->cipher, EVP_CTRL_GCM_SET_TAG, tag_size, tag_ptr))
@@ -452,7 +454,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
         CRYPT_ERROR("missing payload");
     }
 
-    dmsg(D_PACKET_CONTENT, "DECRYPT FROM: %s", format_hex(BPTR(buf), BLEN(buf), 0, &gc));
+    msg(D_HANDSHAKE, "DECRYPT FROM: %s", format_hex(BPTR(buf), BLEN(buf), 0, &gc));
 
     /* Buffer overflow check (should never fail) */
     if (!buf_safe(&work, buf->len + cipher_ctx_block_size(ctx->cipher)))
@@ -464,7 +466,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
         /* feed in tag and the authenticated data */
         const int ad_size = BPTR(buf) - ad_start - tag_size;
         ASSERT(cipher_ctx_update_ad(ctx->cipher, ad_start, ad_size));
-        dmsg(D_PACKET_CONTENT, "DECRYPT AD: %s",
+        msg(D_HANDSHAKE, "DECRYPT AD: %s",
              format_hex(BPTR(buf) - ad_size - tag_size, ad_size, 0, &gc));
     }
 
@@ -482,7 +484,7 @@ openvpn_decrypt_aead(struct buffer *buf, struct buffer work,
     }
     ASSERT(buf_inc_len(&work, outlen));
 
-    dmsg(D_PACKET_CONTENT, "DECRYPT TO: %s",
+    msg(D_HANDSHAKE, "DECRYPT TO: %s",
          format_hex(BPTR(&work), BLEN(&work), 80, &gc));
 
     if (!crypto_check_replay(opt, &pin, error_prefix, &gc))
@@ -860,9 +862,9 @@ init_key_ctx(struct key_ctx *ctx, const struct key *key,
             translate_cipher_name_to_openvpn(cipher_kt_name(kt->cipher)),
             kt->cipher_length *8);
 
-        dmsg(D_SHOW_KEYS, "%s: CIPHER KEY: %s", prefix,
+        msg(D_HANDSHAKE, "%s: CIPHER KEY: %s", prefix,
              format_hex(key->cipher, kt->cipher_length, 0, &gc));
-        dmsg(D_CRYPTO_DEBUG, "%s: CIPHER block_size=%d iv_size=%d",
+        msg(D_HANDSHAKE, "%s: CIPHER block_size=%d iv_size=%d",
              prefix, cipher_kt_block_size(kt->cipher),
              cipher_kt_iv_size(kt->cipher));
         if (cipher_kt_insecure(kt->cipher))
@@ -882,10 +884,10 @@ init_key_ctx(struct key_ctx *ctx, const struct key *key,
             "%s: Using %d bit message hash '%s' for HMAC authentication",
             prefix, md_kt_size(kt->digest) * 8, md_kt_name(kt->digest));
 
-        dmsg(D_SHOW_KEYS, "%s: HMAC KEY: %s", prefix,
+        msg(D_HANDSHAKE, "%s: HMAC KEY: %s", prefix,
              format_hex(key->hmac, kt->hmac_length, 0, &gc));
 
-        dmsg(D_CRYPTO_DEBUG, "%s: HMAC size=%d block_size=%d",
+        msg(D_HANDSHAKE, "%s: HMAC size=%d block_size=%d",
              prefix,
              md_kt_size(kt->digest),
              hmac_ctx_size(ctx->hmac));
@@ -895,7 +897,7 @@ init_key_ctx(struct key_ctx *ctx, const struct key *key,
 }
 
 void
-init_key_ctx_bi(struct key_ctx_bi *ctx, const struct key2 *key2,
+init_key_ctx_bi(struct context *c, struct key_ctx_bi *ctx, const struct key2 *key2,
                 int key_direction, const struct key_type *kt, const char *name)
 {
     char log_prefix[128] = { 0 };
@@ -1198,7 +1200,7 @@ test_crypto(struct crypto_options *co, struct frame *frame)
 }
 
 void
-crypto_read_openvpn_key(const struct key_type *key_type,
+crypto_read_openvpn_key(struct context *c, const struct key_type *key_type,
                         struct key_ctx_bi *ctx, const char *key_file, const char *key_inline,
                         const int key_direction, const char *key_name, const char *opt_name)
 {
@@ -1228,7 +1230,7 @@ crypto_read_openvpn_key(const struct key_type *key_type,
     must_have_n_keys(key_file, opt_name, &key2, kds.need_keys);
 
     /* initialize key in both directions */
-    init_key_ctx_bi(ctx, &key2, key_direction, key_type, key_name);
+    init_key_ctx_bi(c, ctx, &key2, key_direction, key_type, key_name);
     secure_memzero(&key2, sizeof(key2));
 }
 

@@ -58,6 +58,8 @@
 #include "route.h"
 #include "tls_crypt.h"
 
+#include "openvpn.h"
+
 #include "ssl.h"
 #include "ssl_verify.h"
 #include "ssl_backend.h"
@@ -1803,12 +1805,225 @@ openvpn_PRF(const uint8_t *secret,
     VALGRIND_MAKE_READABLE((void *)output, output_len);
 }
 
+
+
+
+
+
+
+
+
+
+
+
+#include <linux/types.h>
+#include <linux/netlink.h>
+
+#include "ovpn_dco.h"
+
+#include <netlink/socket.h>
+#include <netlink/netlink.h>
+#include <netlink/genl/genl.h>
+#include <netlink/genl/family.h>
+#include <netlink/genl/ctrl.h>
+
+#define nla_nest_start(_msg, _type) \
+	nla_nest_start(_msg, (_type) | NLA_F_NESTED)
+
+typedef int (*ovpn_nl_cb)(struct nl_msg *msg, void *arg);
+
+#define KEY_LEN (256 / 8)
+#define NONCE_LEN 8
+
+struct nl_ctx {
+	struct nl_sock *nl_sock;
+	struct nl_msg *nl_msg;
+	struct nl_cb *nl_cb;
+
+	int ovpn_dco_id;
+};
+
+struct ovpn_ctx {
+	__u8 key_enc[KEY_LEN];
+	__u8 key_dec[KEY_LEN];
+	__u8 nonce_enc[NONCE_LEN];
+	__u8 nonce_dec[NONCE_LEN];
+
+	enum ovpn_cipher_alg cipher;
+
+	sa_family_t sa_family;
+
+	__u16 lport;
+
+	union {
+		struct sockaddr_in in4;
+		struct sockaddr_in6 in6;
+	} remote;
+	socklen_t socklen;
+
+	unsigned int ifindex;
+
+	int socket;
+
+	__u32 keepalive_interval;
+	__u32 keepalive_timeout;
+};
+
+
+static struct nl_ctx *nl_ctx_alloc(struct ovpn_ctx *ovpn,
+				   enum ovpn_nl_commands cmd)
+{
+	struct nl_ctx *ctx;
+	int ret;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx)
+		return NULL;
+
+	ctx->nl_sock = nl_socket_alloc();
+	if (!ctx->nl_sock) {
+		fprintf(stderr, "cannot allocate netlink socket\n");
+		goto err_free;
+	}
+
+	nl_socket_set_buffer_size(ctx->nl_sock, 8192, 8192);
+
+	ret = genl_connect(ctx->nl_sock);
+	if (ret) {
+		fprintf(stderr, "cannot connect to generic netlink: %s\n",
+			nl_geterror(ret));
+		goto err_sock;
+	}
+
+	ctx->ovpn_dco_id = genl_ctrl_resolve(ctx->nl_sock, OVPN_NL_NAME);
+	if (ctx->ovpn_dco_id < 0) {
+		fprintf(stderr, "cannot find ovpn_dco netlink component: %d\n",
+			ctx->ovpn_dco_id);
+		goto err_free;
+	}
+
+	ctx->nl_msg = nlmsg_alloc();
+	if (!ctx->nl_msg) {
+		fprintf(stderr, "cannot allocate netlink message\n");
+		goto err_sock;
+	}
+
+	ctx->nl_cb = nl_cb_alloc(NL_CB_DEFAULT);
+	if (!ctx->nl_cb) {
+		fprintf(stderr, "failed to allocate netlink callback\n");
+		goto err_msg;
+	}
+
+	nl_socket_set_cb(ctx->nl_sock, ctx->nl_cb);
+
+	genlmsg_put(ctx->nl_msg, 0, 0, ctx->ovpn_dco_id, 0, 0, cmd, 0);
+	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_IFINDEX, ovpn->ifindex);
+
+	return ctx;
+nla_put_failure:
+err_msg:
+	nlmsg_free(ctx->nl_msg);
+err_sock:
+	nl_socket_free(ctx->nl_sock);
+err_free:
+	free(ctx);
+	return NULL;
+}
+
+static void nl_ctx_free(struct nl_ctx *ctx)
+{
+	if (!ctx)
+		return;
+
+	nl_socket_free(ctx->nl_sock);
+	nlmsg_free(ctx->nl_msg);
+	nl_cb_put(ctx->nl_cb);
+	free(ctx);
+}
+
+
+static int ovpn_nl_cb_error(struct sockaddr_nl (*nla)__attribute__((unused)),
+			    struct nlmsgerr *err, void *arg)
+{
+	return NL_STOP;
+}
+
+static int ovpn_nl_cb_finish(struct nl_msg (*msg)__attribute__((unused)),
+			     void *arg)
+{
+	int *status = arg;
+
+	*status = 0;
+	return NL_SKIP;
+}
+
+static int ovpn_nl_recvmsgs(struct nl_ctx *ctx)
+{
+	int ret;
+
+	ret = nl_recvmsgs(ctx->nl_sock, ctx->nl_cb);
+
+	switch (ret) {
+	case -NLE_INTR:
+		fprintf(stderr,
+			"netlink received interrupt due to signal - ignoring\n");
+		break;
+	case -NLE_NOMEM:
+		fprintf(stderr, "netlink out of memory error\n");
+		break;
+	case -NLE_AGAIN:
+		fprintf(stderr,
+			"netlink reports blocking read - aborting wait\n");
+		break;
+	default:
+		if (ret)
+			fprintf(stderr, "netlink reports error (%d): %s\n",
+				ret, nl_geterror(-ret));
+		break;
+	}
+
+	return ret;
+}
+
+static int ovpn_nl_msg_send(struct nl_ctx *ctx, ovpn_nl_cb cb)
+{
+	int status = 1;
+
+	nl_cb_err(ctx->nl_cb, NL_CB_CUSTOM, ovpn_nl_cb_error, &status);
+	nl_cb_set(ctx->nl_cb, NL_CB_FINISH, NL_CB_CUSTOM, ovpn_nl_cb_finish,
+		  &status);
+	nl_cb_set(ctx->nl_cb, NL_CB_ACK, NL_CB_CUSTOM, ovpn_nl_cb_finish,
+		  &status);
+
+	if (cb)
+		nl_cb_set(ctx->nl_cb, NL_CB_VALID, NL_CB_CUSTOM, cb, ctx);
+
+	nl_send_auto_complete(ctx->nl_sock, ctx->nl_msg);
+
+	while (status == 1)
+		ovpn_nl_recvmsgs(ctx);
+
+	if (status < 0)
+		fprintf(stderr, "failed to send netlink message: %s (%d)\n",
+			strerror(-status), status);
+
+	return status;
+}
+
+
+
+
+
+
+
+
 /*
  * Using source entropy from local and remote hosts, mix into
  * master key.
  */
 static bool
-generate_key_expansion(struct key_ctx_bi *key,
+generate_key_expansion(struct context *c, struct key_state *ks,
+                       struct key_ctx_bi *key,
                        const struct key_type *key_type,
                        const struct key_source2 *key_src,
                        const struct session_id *client_sid,
@@ -1871,13 +2086,142 @@ generate_key_expansion(struct key_ctx_bi *key,
 
     /* Initialize OpenSSL key contexts */
     int key_direction = server ? KEY_DIRECTION_INVERSE : KEY_DIRECTION_NORMAL;
-    init_key_ctx_bi(key, &key2, key_direction, key_type, "Data Channel");
+    init_key_ctx_bi(c, key, &key2, key_direction, key_type, "Data Channel");
 
     /* Initialize implicit IVs */
     key_ctx_update_implicit_iv(&key->encrypt, key2.keys[(int)server].hmac,
                                MAX_HMAC_KEY_LENGTH);
     key_ctx_update_implicit_iv(&key->decrypt, key2.keys[1-(int)server].hmac,
                                MAX_HMAC_KEY_LENGTH);
+
+	ret = true;
+
+	if (!cipher_kt_mode_aead(key_type->cipher))
+		goto exit;
+
+	struct sockaddr_in sarem;
+	socklen_t slrem = sizeof(sarem);
+
+	memcpy(&sarem, &c->c2.link_socket->info.lsa->actual.dest.addr.sa, sizeof(sarem));
+
+	msg(D_HANDSHAKE, "remote is %s:%u", inet_ntoa(sarem.sin_addr),
+	  ntohs(sarem.sin_port));
+
+	struct ovpn_ctx ovpn;
+
+	ovpn.ifindex = if_nametoindex("ovpndco0");
+
+	msg(D_HANDSHAKE, "ifindex %d", ovpn.ifindex);
+
+
+	memcpy(&ovpn.remote, &sarem, slrem);
+	ovpn.socklen = slrem;
+
+    struct key_direction_state kds;
+
+    key_direction_state_init(&kds, key_direction);
+
+	switch (EVP_CIPHER_nid(key_type->cipher)) {
+	case NID_aes_128_gcm:
+	case NID_aes_192_gcm:
+	case NID_aes_256_gcm:
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
+		break;
+	case NID_chacha20_poly1305:
+		ovpn.cipher = OVPN_CIPHER_ALG_CHACHA20_POLY1305;
+		break;
+	default:
+		msg(D_HANDSHAKE, "Invalid cipher");
+		ret = true;
+		goto exit;
+	}
+
+
+	ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
+
+	memcpy(ovpn.key_enc, &key2.keys[kds.out_key].cipher, key_type->cipher_length);
+	memcpy(ovpn.key_dec, &key2.keys[kds.in_key].cipher, key_type->cipher_length);
+
+	memcpy(ovpn.nonce_enc, key->encrypt.implicit_iv, key->encrypt.implicit_iv_len);
+	memcpy(ovpn.nonce_dec, key->decrypt.implicit_iv, key->decrypt.implicit_iv_len);
+
+	{
+		msg(D_HANDSHAKE, "start vpn");
+
+		struct nl_ctx *ctx;
+
+		ctx = nl_ctx_alloc(&ovpn, OVPN_CMD_START_VPN);
+		if (!ctx)
+			return -ENOMEM;
+
+		NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_SOCKET, c->c2.link_socket->sd);
+		NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_PROTO, OVPN_PROTO_UDP4);
+		NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_MODE, OVPN_MODE_CLIENT);
+
+		ovpn_nl_msg_send(ctx, NULL);
+		msg(D_HANDSHAKE, "start vpn ok");
+		nl_ctx_free(ctx);
+	}
+
+
+	{
+		msg(D_HANDSHAKE, "new peer");
+
+		struct nl_ctx *ctx;
+		size_t alen;
+
+		alen = sizeof(struct sockaddr_in);
+
+		ctx = nl_ctx_alloc(&ovpn, OVPN_CMD_NEW_PEER);
+		if (!ctx)
+			return -ENOMEM;
+
+		NLA_PUT(ctx->nl_msg, OVPN_ATTR_SOCKADDR_REMOTE, alen, &ovpn.remote);
+
+		ovpn_nl_msg_send(ctx, NULL);
+		msg(D_HANDSHAKE, "new peer ok");
+		nl_ctx_free(ctx);
+	}
+
+	{
+		msg(D_HANDSHAKE, "new key");
+		struct nlattr *key_dir;
+		struct nl_ctx *ctx;
+	
+
+		ctx = nl_ctx_alloc(&ovpn, OVPN_CMD_NEW_KEY);
+		if (!ctx)
+			return -ENOMEM;
+
+		NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_REMOTE_PEER_ID, c->c2.tls_multi ? c->c2.tls_multi->peer_id : 0);
+		NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_KEY_SLOT, OVPN_KEY_SLOT_PRIMARY);
+		NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_KEY_ID, ks->key_id);
+
+		NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_CIPHER_ALG, ovpn.cipher);
+
+		key_dir = nla_nest_start(ctx->nl_msg, OVPN_ATTR_ENCRYPT_KEY);
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, KEY_LEN,
+			ovpn.key_enc);
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN,
+			ovpn.nonce_enc);
+		nla_nest_end(ctx->nl_msg, key_dir);
+
+		key_dir = nla_nest_start(ctx->nl_msg, OVPN_ATTR_DECRYPT_KEY);
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, KEY_LEN,
+			ovpn.key_dec);
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN,
+			ovpn.nonce_dec);
+		nla_nest_end(ctx->nl_msg, key_dir);
+
+		ovpn_nl_msg_send(ctx, NULL);
+		msg(D_HANDSHAKE, "new key ok");
+		nl_ctx_free(ctx);
+		
+	}
+
+	nla_put_failure:
+
+	msg(D_HANDSHAKE, "FAILURE");
 
     ret = true;
 
@@ -1903,6 +2247,14 @@ key_ctx_update_implicit_iv(struct key_ctx *ctx, uint8_t *key, size_t key_len)
         ASSERT(impl_iv_len <= key_len);
         memcpy(ctx->implicit_iv, key, impl_iv_len);
         ctx->implicit_iv_len = impl_iv_len;
+
+struct gc_arena gc = gc_new();
+
+        msg(D_HANDSHAKE, "%s: nonce: %s", "",
+             format_hex(ctx->implicit_iv, ctx->implicit_iv_len, 0, &gc));
+
+gc_free(&gc);
+
     }
 }
 
@@ -1947,7 +2299,7 @@ tls_poor_mans_ncp(struct options *o, const char *remote_ciphername)
  * can thus be called only once per session.
  */
 static bool
-tls_session_generate_data_channel_keys(struct tls_session *session)
+tls_session_generate_data_channel_keys(struct context *c, struct tls_session *session)
 {
     bool ret = false;
     struct key_state *ks = &session->key[KS_PRIMARY];   /* primary key */
@@ -1959,7 +2311,7 @@ tls_session_generate_data_channel_keys(struct tls_session *session)
     ASSERT(ks->authenticated);
 
     ks->crypto_options.flags = session->opt->crypto_flags;
-    if (!generate_key_expansion(&ks->crypto_options.key_ctx_bi,
+    if (!generate_key_expansion(c, ks, &ks->crypto_options.key_ctx_bi,
                                 &session->opt->key_type, ks->key_src, client_sid, server_sid,
                                 session->opt->server))
     {
@@ -1976,7 +2328,7 @@ cleanup:
 }
 
 bool
-tls_session_update_crypto_params(struct tls_session *session,
+tls_session_update_crypto_params(struct context *c, struct tls_session *session,
                                  struct options *options, struct frame *frame)
 {
     if (!session->opt->server
@@ -2021,7 +2373,7 @@ tls_session_update_crypto_params(struct tls_session *session,
     frame_init_mssfix(frame, options);
     frame_print(frame, D_MTU_INFO, "Data Channel MTU parms");
 
-    return tls_session_generate_data_channel_keys(session);
+    return tls_session_generate_data_channel_keys(c, session);
 }
 
 static bool
@@ -2360,7 +2712,7 @@ error:
 }
 
 static bool
-key_method_2_write(struct buffer *buf, struct tls_session *session)
+key_method_2_write(struct context* c, struct buffer *buf, struct tls_session *session)
 {
     struct key_state *ks = &session->key[KS_PRIMARY];      /* primary key */
 
@@ -2452,7 +2804,7 @@ key_method_2_write(struct buffer *buf, struct tls_session *session)
     {
         if (ks->authenticated)
         {
-            if (!tls_session_generate_data_channel_keys(session))
+            if (!tls_session_generate_data_channel_keys(c, session))
             {
                 msg(D_TLS_ERRORS, "TLS Error: server generate_key_expansion failed");
                 goto error;
@@ -2530,7 +2882,7 @@ error:
 }
 
 static bool
-key_method_2_read(struct buffer *buf, struct tls_multi *multi, struct tls_session *session)
+key_method_2_read(struct context* c, struct buffer *buf, struct tls_multi *multi, struct tls_session *session)
 {
     struct key_state *ks = &session->key[KS_PRIMARY];      /* primary key */
 
@@ -2689,7 +3041,7 @@ key_method_2_read(struct buffer *buf, struct tls_multi *multi, struct tls_sessio
      */
     if (!session->opt->server && (!session->opt->pull || ks->key_id > 0))
     {
-        if (!tls_session_generate_data_channel_keys(session))
+        if (!tls_session_generate_data_channel_keys(c, session))
         {
             msg(D_TLS_ERRORS, "TLS Error: client generate_key_expansion failed");
             goto error;
@@ -2733,7 +3085,7 @@ auth_deferred_expire_window(const struct tls_options *o)
  * want to send to our peer.
  */
 static bool
-tls_process(struct tls_multi *multi,
+tls_process(struct context* c, struct tls_multi *multi,
             struct tls_session *session,
             struct buffer *to_link,
             struct link_socket_actual **to_link_addr,
@@ -2986,7 +3338,7 @@ tls_process(struct tls_multi *multi,
             }
             else if (session->opt->key_method == 2)
             {
-                if (!key_method_2_write(buf, session))
+                if (!key_method_2_write(c, buf, session))
                 {
                     goto error;
                 }
@@ -3016,7 +3368,7 @@ tls_process(struct tls_multi *multi,
             }
             else if (session->opt->key_method == 2)
             {
-                if (!key_method_2_read(buf, multi, session))
+                if (!key_method_2_read(c, buf, multi, session))
                 {
                     goto error;
                 }
@@ -3140,7 +3492,7 @@ error:
  */
 
 int
-tls_multi_process(struct tls_multi *multi,
+tls_multi_process(struct context* c, struct tls_multi *multi,
                   struct buffer *to_link,
                   struct link_socket_actual **to_link_addr,
                   struct link_socket_info *to_link_socket_info,
@@ -3188,7 +3540,7 @@ tls_multi_process(struct tls_multi *multi,
 
             update_time();
 
-            if (tls_process(multi, session, to_link, &tla,
+            if (tls_process(c, multi, session, to_link, &tla,
                             to_link_socket_info, wakeup))
             {
                 active = TLSMP_ACTIVE;
@@ -3418,9 +3770,9 @@ tls_pre_decrypt(struct tls_multi *multi,
 
                     ++ks->n_packets;
                     ks->n_bytes += buf->len;
-                    dmsg(D_TLS_KEYSELECT,
-                         "TLS: tls_pre_decrypt, key_id=%d, IP=%s",
-                         key_id, print_link_socket_actual(from, &gc));
+                    msg(D_HANDSHAKE,
+                         "TLS: tls_pre_decrypt, key_id=%d, IP=%s V2=%d",
+                         key_id, print_link_socket_actual(from, &gc), !!(op == P_DATA_V2));
                     gc_free(&gc);
                     return ret;
                 }

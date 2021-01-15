@@ -131,6 +131,8 @@
 #include "packet_id.h"
 #include "mtu.h"
 
+struct context;
+
 /** Wrapper struct to pass around SHA256 digests */
 struct sha256_digest {
     uint8_t digest[SHA256_DIGEST_LENGTH];
@@ -323,7 +325,7 @@ void init_key_ctx(struct key_ctx *ctx, const struct key *key,
 
 void free_key_ctx(struct key_ctx *ctx);
 
-void init_key_ctx_bi(struct key_ctx_bi *ctx, const struct key2 *key2,
+void init_key_ctx_bi(struct context *c, struct key_ctx_bi *ctx, const struct key2 *key2,
                      int key_direction, const struct key_type *kt,
 		     const char *name);
 
@@ -486,7 +488,7 @@ void key2_print(const struct key2 *k,
                 const char *prefix0,
                 const char *prefix1);
 
-void crypto_read_openvpn_key(const struct key_type *key_type,
+void crypto_read_openvpn_key(struct context *c, const struct key_type *key_type,
                              struct key_ctx_bi *ctx, const char *key_file, const char *key_inline,
                              const int key_direction, const char *key_name, const char *opt_name);
 
