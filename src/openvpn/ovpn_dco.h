@@ -69,6 +69,11 @@ enum ovpn_nl_commands {
 	OVPN_CMD_PACKET,
 };
 
+enum ovpn_data_format {
+	OVPN_P_DATA_V1 = P_DATA_V1,
+	OVPN_P_DATA_V2 = P_DATA_V2
+};
+
 enum ovpn_mode {
 	OVPN_MODE_UNDEF = 0,
 	OVPN_MODE_CLIENT,
@@ -132,6 +137,7 @@ enum ovpn_attrs {
 	OVPN_ATTR_MODE,
 	OVPN_ATTR_SOCKET,
 	OVPN_ATTR_PROTO,
+	OVPN_ATTR_DATA_FORMAT,
 
 	OVPN_ATTR_REMOTE_PEER_ID,
 

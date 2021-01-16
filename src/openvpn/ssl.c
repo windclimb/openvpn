@@ -1903,6 +1903,11 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 
 	msg(D_HANDSHAKE, "ifindex %d", ovpn.ifindex);
 
+	ovpn.data_format =
+		(c->c2.tls_multi && c->c2.tls_multi->use_peer_id) ?
+			OVPN_P_DATA_V2 :
+			OVPN_P_DATA_V1;
+
 	memcpy(&ovpn.remote, &sarem, slrem);
 	ovpn.socklen = slrem;
 

@@ -38,6 +38,8 @@ struct ovpn_ctx {
 
 	__u32 keepalive_interval;
 	__u32 keepalive_timeout;
+
+	__u8 data_format;
 };
 
 int netlink_dco_start_udp4_vpn(struct ovpn_ctx *ovpn, const int sd);

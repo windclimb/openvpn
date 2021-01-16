@@ -48,6 +48,7 @@ typedef int interval_t;
  * Used as an upper bound for timeouts.
  */
 #define BIG_TIMEOUT  (60*60*24*7)  /* one week (in seconds) */
+#define NL_DCO_TIMEOUT (2) // seconds
 
 /*
  * Printf formats for special types

@@ -1582,7 +1582,7 @@ pre_select(struct context *c)
      * reduce to a timeout that reflects the component which
      * needs the earliest service.
      */
-    c->c2.timeval.tv_sec = BIG_TIMEOUT;
+    c->c2.timeval.tv_sec = NL_DCO_TIMEOUT; //BIG_TIMEOUT;
     c->c2.timeval.tv_usec = 0;
 
 #if defined(_WIN32)

@@ -166,8 +166,8 @@ static int ovpn_nl_msg_send(struct nl_ctx *ctx, ovpn_nl_cb cb)
 
 	nl_send_auto_complete(ctx->nl_sock, ctx->nl_msg);
 
-	while (status == 1)
-		ovpn_nl_recvmsgs(ctx);
+	while (status == 1 && ovpn_nl_recvmsgs(ctx) > 0)
+		;;
 
 	if (status < 0)
 		msg(D_HANDSHAKE, "failed to send netlink message: %s (%d)",
@@ -189,8 +189,8 @@ static int ovpn_nl_process_queue(struct nl_ctx *ctx, ovpn_nl_cb cb)
 	if (cb)
 		nl_cb_set(ctx->nl_cb, NL_CB_VALID, NL_CB_CUSTOM, cb, ctx);
 
-	while (status == 1)
-		ovpn_nl_recvmsgs(ctx);
+	while (status == 1 && ovpn_nl_recvmsgs(ctx) > 0)
+		;;
 
 	if (status < 0)
 		msg(D_HANDSHAKE, "failed to send netlink message: %s (%d)",
@@ -212,6 +212,7 @@ int netlink_dco_start_udp4_vpn(struct ovpn_ctx *ovpn, const int sd)
 	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_SOCKET, sd);
 	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_PROTO, OVPN_PROTO_UDP4);
 	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_MODE, OVPN_MODE_CLIENT);
+	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_DATA_FORMAT, ovpn->data_format);
 
 	ovpn_nl_msg_send(ctx, NULL);
 	msg(D_HANDSHAKE, "start vpn ok");
@@ -342,7 +343,6 @@ static int netlink_dco_handle_packet(struct nl_msg *msg, void *arg)
 
         /* increment authenticated receive byte count */
         c->c2.link_read_bytes_auth += c->c2.buf.len;
-
 	}
 
 	struct gc_arena gc = gc_new();
@@ -386,6 +386,8 @@ void *netlink_dco_register(struct ovpn_ctx *ovpn, struct context *c)
 		return NULL;
 	}
 
+	nl_socket_enable_msg_peek(ctx->nl_sock);
+
 	return ctx;
 }
 
@@ -406,4 +408,6 @@ void netlink_dco_process(struct context *c)
 
 	ovpn_nl_process_queue((struct nl_ctx *)c->c2.nl_dco_ctx,
 		netlink_dco_handle_packet);
+
+	msg(D_HANDSHAKE, "process nlqueue done");
 }
