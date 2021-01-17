@@ -1899,6 +1899,8 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 
 	struct ovpn_ctx ovpn;
 
+	memset(&ovpn, 0, sizeof(ovpn));
+
 	ovpn.ifindex = if_nametoindex("ovpndco0");
 
 	msg(D_HANDSHAKE, "ifindex %d", ovpn.ifindex);
@@ -1936,27 +1938,37 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 	memcpy(ovpn.nonce_enc, key->encrypt.implicit_iv, key->encrypt.implicit_iv_len);
 	memcpy(ovpn.nonce_dec, key->decrypt.implicit_iv, key->decrypt.implicit_iv_len);
 
-	if (netlink_dco_start_udp4_vpn(&ovpn, c->c2.link_socket->sd))
-		goto exit;
+	int first = 0;
 
-	if (netlink_dco_new_peer(&ovpn))
-		goto exit;
-
-    if (c->options.ping_send_timeout && c->options.ping_rec_timeout)
-    {
-		ovpn.keepalive_interval = c->options.ping_send_timeout;
-		ovpn.keepalive_timeout = c->options.ping_rec_timeout;
-
-		if (netlink_dco_set_peer(&ovpn))
+	if (c->c2.nl_dco_ctx == NULL) {
+		if (netlink_dco_start_udp4_vpn(&ovpn, c->c2.link_socket->sd))
 			goto exit;
-    }
 
-	if (netlink_dco_new_key(&ovpn, c->c2.tls_multi ? c->c2.tls_multi->peer_id : 0, ks->key_id))
+		if (netlink_dco_new_peer(&ovpn))
+			goto exit;
+
+		if (c->options.ping_send_timeout && c->options.ping_rec_timeout)
+		{
+			ovpn.keepalive_interval = c->options.ping_send_timeout;
+			ovpn.keepalive_timeout = c->options.ping_rec_timeout;
+
+			if (netlink_dco_set_peer(&ovpn))
+				goto exit;
+		}
+
+		c->c2.nl_dco_ctx = netlink_dco_register(&ovpn, c);
+		first = 1;
+	}
+
+	ovpn.nl_ctx = c->c2.nl_dco_ctx;
+
+	if (netlink_dco_new_key(&ovpn,
+			c->c2.tls_multi ? c->c2.tls_multi->peer_id : 0,
+			ks->key_id,
+			first ? OVPN_KEY_SLOT_PRIMARY : OVPN_KEY_SLOT_SECONDARY))
 		goto exit;
 
-	c->c2.nl_dco_ctx = netlink_dco_register(&ovpn, c);
-
-    ret = true;
+	ret = true;
 
 exit:
     secure_memzero(&master, sizeof(master));

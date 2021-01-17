@@ -22,6 +22,10 @@
 #include <netlink/genl/family.h>
 #include <netlink/genl/ctrl.h>
 
+#include <ndm/time.h>
+
+#define KEYS_SWAP_INTERVAL_		10 /* seconds */
+
 #define nla_nest_start(_msg, _type) \
 	nla_nest_start(_msg, (_type) | NLA_F_NESTED)
 
@@ -34,6 +38,8 @@ struct nl_ctx {
 	struct context *c;
 
 	int ovpn_dco_id;
+	struct timespec key_install_time;
+	int ovpn_dco_ifindex;
 };
 
 static struct nl_ctx *nl_ctx_alloc(struct ovpn_ctx *ovpn,
@@ -85,6 +91,8 @@ static struct nl_ctx *nl_ctx_alloc(struct ovpn_ctx *ovpn,
 	genlmsg_put(ctx->nl_msg, 0, 0, ctx->ovpn_dco_id, 0, 0, cmd, 0);
 	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_IFINDEX, ovpn->ifindex);
 
+	ctx->ovpn_dco_ifindex = ovpn->ifindex;
+
 	return ctx;
 nla_put_failure:
 err_msg:
@@ -106,7 +114,6 @@ static void nl_ctx_free(struct nl_ctx *ctx)
 	nl_cb_put(ctx->nl_cb);
 	free(ctx);
 }
-
 
 static int ovpn_nl_cb_error(struct sockaddr_nl (*nla)__attribute__((unused)),
 			    struct nlmsgerr *err, void *arg)
@@ -269,18 +276,22 @@ nla_put_failure:
 	return ret;
 }
 
-int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uint16_t key_id)
+int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uint16_t key_id, enum ovpn_key_slot slot)
 {
 	msg(D_HANDSHAKE, "new key");
 	struct nlattr *key_dir;
-	struct nl_ctx *ctx;
+	struct nl_ctx *ctx = ovpn->nl_ctx;
 
-	ctx = nl_ctx_alloc(ovpn, OVPN_CMD_NEW_KEY);
-	if (!ctx)
-		return -ENOMEM;
+	ctx->nl_msg = nlmsg_alloc();
+	if (!ctx->nl_msg) {
+		msg(D_HANDSHAKE, "cannot allocate netlink message");
+	}
+
+	genlmsg_put(ctx->nl_msg, 0, 0, ctx->ovpn_dco_id, 0, 0, OVPN_CMD_NEW_KEY, 0);
+	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_IFINDEX, ovpn->ifindex);
 
 	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_REMOTE_PEER_ID, peer_id);
-	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_KEY_SLOT, OVPN_KEY_SLOT_PRIMARY);
+	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_KEY_SLOT, slot);
 	NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_KEY_ID, key_id);
 
 	NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_CIPHER_ALG, ovpn->cipher);
@@ -298,8 +309,37 @@ int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uin
 	ovpn_nl_msg_send(ctx, NULL);
 	msg(D_HANDSHAKE, "new key ok");
 
+	if (slot == OVPN_KEY_SLOT_SECONDARY)
+		ndm_time_get_monotonic(&ctx->key_install_time);
+	else
+		memset(&ctx->key_install_time, 0, sizeof(ctx->key_install_time));
+
 nla_put_failure:
-	nl_ctx_free(ctx);
+	//nl_ctx_free(ctx);
+	nlmsg_free(ctx->nl_msg);
+
+	return 0;
+}
+
+static int netlink_dco_swap_keys(struct nl_ctx *ctx)
+{
+	msg(D_HANDSHAKE, "swap keys");
+
+	ctx->nl_msg = nlmsg_alloc();
+	if (!ctx->nl_msg) {
+		msg(D_HANDSHAKE, "cannot allocate netlink message");
+	}
+
+	genlmsg_put(ctx->nl_msg, 0, 0, ctx->ovpn_dco_id, 0, 0, OVPN_CMD_SWAP_KEYS, 0);
+	NLA_PUT_U32(ctx->nl_msg, OVPN_ATTR_IFINDEX, ctx->ovpn_dco_ifindex);
+
+	ovpn_nl_msg_send(ctx, NULL);
+	msg(D_HANDSHAKE, "swap keys ok");
+
+nla_put_failure:
+	//nl_ctx_free(ctx);
+
+	nlmsg_free(ctx->nl_msg);
 
 	return 0;
 }
@@ -388,6 +428,8 @@ void *netlink_dco_register(struct ovpn_ctx *ovpn, struct context *c)
 
 	nl_socket_enable_msg_peek(ctx->nl_sock);
 
+	nlmsg_free(ctx->nl_msg);
+
 	return ctx;
 }
 
@@ -401,13 +443,25 @@ void netlink_dco_cleanup_context(struct context *c)
 
 void netlink_dco_process(struct context *c)
 {
-	if (c->c2.nl_dco_ctx == NULL)
+	struct timespec ts;
+	struct nl_ctx *ctx = (struct nl_ctx *)c->c2.nl_dco_ctx;
+
+	if (ctx == NULL)
 		return;
 
 	msg(D_HANDSHAKE, "process nlqueue");
 
-	ovpn_nl_process_queue((struct nl_ctx *)c->c2.nl_dco_ctx,
-		netlink_dco_handle_packet);
+	ovpn_nl_process_queue(ctx, netlink_dco_handle_packet);
+
+	if (!ndm_time_is_zero(&ctx->key_install_time)) {
+		if (ndm_time_to_sec(&ts) >
+			ndm_time_to_sec(&ctx->key_install_time) + KEYS_SWAP_INTERVAL_) {
+			if (netlink_dco_swap_keys(ctx))
+				msg(D_HANDSHAKE, "swap keys error");
+			else
+				memset(&ctx->key_install_time, 0, sizeof(ctx->key_install_time));
+		}
+	}
 
 	msg(D_HANDSHAKE, "process nlqueue done");
 }

@@ -13,6 +13,7 @@
 #define NONCE_LEN 8
 
 struct context;
+struct nl_ctx;
 
 struct ovpn_ctx {
 	__u8 key_enc[KEY_LEN];
@@ -40,12 +41,14 @@ struct ovpn_ctx {
 	__u32 keepalive_timeout;
 
 	__u8 data_format;
+
+	struct nl_ctx *nl_ctx;
 };
 
 int netlink_dco_start_udp4_vpn(struct ovpn_ctx *ovpn, const int sd);
 int netlink_dco_new_peer(struct ovpn_ctx *ovpn);
 int netlink_dco_set_peer(struct ovpn_ctx *ovpn);
-int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uint16_t key_id);
+int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uint16_t key_id, enum ovpn_key_slot slot);
 
 void netlink_dco_cleanup_context(struct context *c);
 void *netlink_dco_register(struct ovpn_ctx *ovpn, struct context *c);
