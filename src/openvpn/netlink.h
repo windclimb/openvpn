@@ -41,6 +41,7 @@ struct ovpn_ctx {
 	__u32 keepalive_timeout;
 
 	__u8 data_format;
+	__u16 fragment_size;
 
 	struct nl_ctx *nl_ctx;
 };

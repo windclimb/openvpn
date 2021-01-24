@@ -221,6 +221,9 @@ int netlink_dco_start_udp4_vpn(struct ovpn_ctx *ovpn, const int sd)
 	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_MODE, OVPN_MODE_CLIENT);
 	NLA_PUT_U8(ctx->nl_msg, OVPN_ATTR_DATA_FORMAT, ovpn->data_format);
 
+	if (ovpn->fragment_size != 0)
+		NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_FRAGMENT_SIZE, ovpn->fragment_size);
+
 	ovpn_nl_msg_send(ctx, NULL);
 	msg(D_HANDSHAKE, "start vpn ok");
 

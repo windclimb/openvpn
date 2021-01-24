@@ -1884,6 +1884,8 @@ generate_key_expansion(struct context *c, struct key_state *ks,
     key_ctx_update_implicit_iv(&key->decrypt, key2.keys[1-(int)server].hmac,
                                MAX_HMAC_KEY_LENGTH);
 
+
+
 	ret = true;
 
 	if (!cipher_kt_mode_aead(key_type->cipher))
@@ -1909,6 +1911,12 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 		(c->c2.tls_multi && c->c2.tls_multi->use_peer_id) ?
 			OVPN_P_DATA_V2 :
 			OVPN_P_DATA_V1;
+
+	if (c->c2.fragment && c->options.ce.fragment > 0) {
+		ovpn.fragment_size = c->options.ce.fragment;
+
+		msg(D_HANDSHAKE, "set fragment to %u", ovpn.fragment_size);
+	}
 
 	memcpy(&ovpn.remote, &sarem, slrem);
 	ovpn.socklen = slrem;
