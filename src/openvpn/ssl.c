@@ -1888,8 +1888,8 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 
 	ret = true;
 
-	if (!cipher_kt_mode_aead(key_type->cipher))
-		goto exit;
+	//if (!cipher_kt_mode_aead(key_type->cipher))
+	//	goto exit;
 
 	struct sockaddr_in sarem;
 	socklen_t slrem = sizeof(sarem);
@@ -1927,12 +1927,32 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 
 	switch (EVP_CIPHER_nid(key_type->cipher)) {
 	case NID_aes_128_gcm:
+		ovpn.enc_key_len = 128 / 8;
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
+		break;
 	case NID_aes_192_gcm:
+		ovpn.enc_key_len = 192 / 8;
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
+		break;
 	case NID_aes_256_gcm:
+		ovpn.enc_key_len = 256 / 8;
 		ovpn.cipher = OVPN_CIPHER_ALG_AES_GCM;
 		break;
 	case NID_chacha20_poly1305:
 		ovpn.cipher = OVPN_CIPHER_ALG_CHACHA20_POLY1305;
+		ovpn.enc_key_len = 256 / 8;
+		break;
+	case NID_aes_128_cbc:
+		ovpn.enc_key_len = 128 / 8;
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_CBC;
+		break;
+	case NID_aes_192_cbc:
+		ovpn.enc_key_len = 192 / 8;
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_CBC;
+		break;
+	case NID_aes_256_cbc:
+		ovpn.enc_key_len = 256 / 8;
+		ovpn.cipher = OVPN_CIPHER_ALG_AES_CBC;
 		break;
 	default:
 		msg(D_HANDSHAKE, "Invalid cipher");
@@ -1943,8 +1963,26 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 	memcpy(ovpn.key_enc, &key2.keys[kds.out_key].cipher, key_type->cipher_length);
 	memcpy(ovpn.key_dec, &key2.keys[kds.in_key].cipher, key_type->cipher_length);
 
-	memcpy(ovpn.nonce_enc, key->encrypt.implicit_iv, key->encrypt.implicit_iv_len);
-	memcpy(ovpn.nonce_dec, key->decrypt.implicit_iv, key->decrypt.implicit_iv_len);
+	ovpn.hmac_alg = OVPN_HMAC_ALG_NONE;
+
+	if (cipher_kt_mode_aead(key_type->cipher)) {
+		memcpy(ovpn.u.nonce.nonce_enc, key->encrypt.implicit_iv, key->encrypt.implicit_iv_len);
+		memcpy(ovpn.u.nonce.nonce_dec, key->decrypt.implicit_iv, key->decrypt.implicit_iv_len);
+	} else if (key_type->digest && key_type->hmac_length > 0) {
+		switch (EVP_MD_type(key_type->digest)) {
+		case NID_sha1:
+			ovpn.hmac_alg = OVPN_HMAC_ALG_SHA1;
+			break;
+		default:
+			msg(D_HANDSHAKE, "Invalid HMAC");
+			ret = true;
+			goto exit;
+		}
+
+		memcpy(ovpn.u.hmac.hmac_key_enc, &key2.keys[kds.out_key].hmac, key_type->hmac_length);
+		memcpy(ovpn.u.hmac.hmac_key_dec, &key2.keys[kds.in_key].hmac, key_type->hmac_length);
+		ovpn.hmac_key_len = key_type->hmac_length;
+	}
 
 	int first = 0;
 

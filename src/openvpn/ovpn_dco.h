@@ -15,6 +15,14 @@
 
 #define OVPN_NL_MULTICAST_GROUP_PEERS "peers"
 
+#ifndef P_DATA_V1
+#define P_DATA_V1                      6     /* data channel packet */
+#endif
+
+#ifndef P_DATA_V2
+#define P_DATA_V2                      9     /* data channel packet with peer-id */
+#endif
+
 /**
  * enum ovpn_nl_commands - supported netlink commands
  */
@@ -93,6 +101,12 @@ enum ovpn_cipher_alg {
 	OVPN_CIPHER_ALG_AES_GCM,
 	OVPN_CIPHER_ALG_CHACHA20_POLY1305,
 	OVPN_CIPHER_ALG_AES_CCM,
+	OVPN_CIPHER_ALG_AES_CBC,
+};
+
+enum ovpn_hmac_alg {
+	OVPN_HMAC_ALG_NONE = 0,
+	OVPN_HMAC_ALG_SHA1,
 };
 
 enum ovpn_del_peer_reason {
@@ -116,6 +130,7 @@ enum ovpn_key_dir_attrs {
 
 	OVPN_KEY_DIR_ATTR_CIPHER_KEY,
 	OVPN_KEY_DIR_ATTR_NONCE_TAIL,
+	OVPN_KEY_DIR_ATTR_HMAC_KEY,
 	__OVPN_KEY_DIR_ATTR_AFTER_LAST,
 	OVPN_KEY_DIR_ATTR_MAX = __OVPN_KEY_DIR_ATTR_AFTER_LAST - 1,
 };
@@ -147,6 +162,7 @@ enum ovpn_attrs {
 
 	OVPN_ATTR_KEY_SLOT,
 	OVPN_ATTR_CIPHER_ALG,
+	OVPN_ATTR_HMAC_ALG,
 	OVPN_ATTR_ENCRYPT_KEY,
 	OVPN_ATTR_DECRYPT_KEY,
 	OVPN_ATTR_KEY_ID,

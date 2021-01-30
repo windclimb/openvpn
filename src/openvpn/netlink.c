@@ -299,14 +299,27 @@ int netlink_dco_new_key(struct ovpn_ctx *ovpn, const uint32_t peer_id, const uin
 
 	NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_CIPHER_ALG, ovpn->cipher);
 
+	if (ovpn->hmac_alg != OVPN_HMAC_ALG_NONE)
+		NLA_PUT_U16(ctx->nl_msg, OVPN_ATTR_HMAC_ALG, ovpn->hmac_alg);
+
 	key_dir = nla_nest_start(ctx->nl_msg, OVPN_ATTR_ENCRYPT_KEY);
-	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, KEY_LEN, ovpn->key_enc);
-	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN, ovpn->nonce_enc);
+	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, ovpn->enc_key_len, ovpn->key_enc);
+
+	if (ovpn->hmac_alg == OVPN_HMAC_ALG_NONE)
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN, ovpn->u.nonce.nonce_enc);
+	else
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_HMAC_KEY, ovpn->hmac_key_len, ovpn->u.hmac.hmac_key_enc);
+
 	nla_nest_end(ctx->nl_msg, key_dir);
 
 	key_dir = nla_nest_start(ctx->nl_msg, OVPN_ATTR_DECRYPT_KEY);
-	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, KEY_LEN, ovpn->key_dec);
-	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN, ovpn->nonce_dec);
+	NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_CIPHER_KEY, ovpn->enc_key_len, ovpn->key_dec);
+
+	if (ovpn->hmac_alg == OVPN_HMAC_ALG_NONE)
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_NONCE_TAIL, NONCE_LEN, ovpn->u.nonce.nonce_dec);
+	else
+		NLA_PUT(ctx->nl_msg, OVPN_KEY_DIR_ATTR_HMAC_KEY, ovpn->hmac_key_len, ovpn->u.hmac.hmac_key_dec);
+
 	nla_nest_end(ctx->nl_msg, key_dir);
 
 	ovpn_nl_msg_send(ctx, NULL);
