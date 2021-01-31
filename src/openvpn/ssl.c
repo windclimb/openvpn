@@ -1888,9 +1888,6 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 
 	ret = true;
 
-	//if (!cipher_kt_mode_aead(key_type->cipher))
-	//	goto exit;
-
 	struct sockaddr_in sarem;
 	socklen_t slrem = sizeof(sarem);
 
@@ -1970,8 +1967,17 @@ generate_key_expansion(struct context *c, struct key_state *ks,
 		memcpy(ovpn.u.nonce.nonce_dec, key->decrypt.implicit_iv, key->decrypt.implicit_iv_len);
 	} else if (key_type->digest && key_type->hmac_length > 0) {
 		switch (EVP_MD_type(key_type->digest)) {
+		case NID_md5:
+			ovpn.hmac_alg = OVPN_HMAC_ALG_MD5;
+			break;
 		case NID_sha1:
 			ovpn.hmac_alg = OVPN_HMAC_ALG_SHA1;
+			break;
+		case NID_sha256:
+			ovpn.hmac_alg = OVPN_HMAC_ALG_SHA256;
+			break;
+		case NID_sha512:
+			ovpn.hmac_alg = OVPN_HMAC_ALG_SHA512;
 			break;
 		default:
 			msg(D_HANDSHAKE, "Invalid HMAC");
