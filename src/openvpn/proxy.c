@@ -642,8 +642,10 @@ establish_http_proxy_passthru(struct http_proxy_info *p,
 {
     struct gc_arena gc = gc_new();
     char buf[512];
+#if NTLM
     char buf2[129];
     char get[80];
+#endif
     int status;
     int nparms;
     bool ret = false;
