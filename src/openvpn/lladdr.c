@@ -21,8 +21,10 @@ int
 set_lladdr(const char *ifname, const char *lladdr,
            const struct env_set *es)
 {
+#if !defined(ENABLE_NDM_INTEGRATION)
     struct argv argv = argv_new();
     int r;
+#endif /* if !defined(ENABLE_NDM_INTEGRATION) */
 
     if (!ifname || !lladdr)
     {
