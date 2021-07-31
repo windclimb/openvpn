@@ -2783,7 +2783,9 @@ print_link_socket_actual_ex(const struct link_socket_actual *act,
 {
     if (act)
     {
+#if ENABLE_IP_PKTINFO
         char ifname[IF_NAMESIZE] = "[undef]";
+#endif
         struct buffer out = alloc_buf_gc(128, gc);
         buf_printf(&out, "%s", print_sockaddr_ex(&act->dest.addr.sa, separator, flags, gc));
 #if ENABLE_IP_PKTINFO
