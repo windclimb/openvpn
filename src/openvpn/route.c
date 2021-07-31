@@ -1907,7 +1907,7 @@ add_route_ipv6(struct route_ipv6 *r6, const struct tuntap *tt, unsigned int flag
     bool status = false;
     const char *device = tt->actual_name;
 
-    bool gateway_needed = false;
+    bool gateway_needed __attribute__((unused)) = false;
 
     if (!(r6->flags & RT_DEFINED) )
     {
@@ -2418,9 +2418,9 @@ delete_route_ipv6(const struct route_ipv6 *r6, const struct tuntap *tt, unsigned
     struct gc_arena gc;
     struct argv argv = argv_new();
     const char *network;
-    const char *gateway;
-    const char *device = tt->actual_name;
-    bool gateway_needed = false;
+    const char *gateway __attribute__((unused));
+    const char *device __attribute__((unused)) = tt->actual_name;
+    bool gateway_needed __attribute__((unused)) = false;
 
     if ((r6->flags & (RT_DEFINED|RT_ADDED)) != (RT_DEFINED|RT_ADDED))
     {
