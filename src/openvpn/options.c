@@ -4987,7 +4987,6 @@ add_option(struct options *options,
 {
     struct gc_arena gc = gc_new();
     const bool pull_mode = BOOL_CAST(permission_mask & OPT_P_PULL_MODE);
-    int msglevel_fc = msglevel_forward_compatible(options, msglevel);
 
     ASSERT(MAX_PARMS >= 7);
 
@@ -5002,7 +5001,6 @@ add_option(struct options *options,
             p[2] = "setenv opt"; /* will trigger an error that includes setenv opt */
         }
         p += 2;
-        msglevel_fc = M_WARN;
     }
 
     if (!file)
@@ -6449,7 +6447,6 @@ add_option(struct options *options,
             if (streq(p[1], "FORWARD_COMPATIBLE") && p[2] && streq(p[2], "1"))
             {
                 options->forward_compatible = true;
-                msglevel_fc = msglevel_forward_compatible(options, msglevel);
             }
             setenv_str(es, p[1], p[2] ? p[2] : "");
         }
