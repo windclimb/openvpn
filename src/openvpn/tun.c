@@ -891,7 +891,9 @@ do_ifconfig(struct tuntap *tt,
         const char *ifconfig_local = NULL;
         const char *ifconfig_remote_netmask = NULL;
         const char *ifconfig_broadcast = NULL;
+#if !defined(ENABLE_NDM_INTEGRATION)
         const char *ifconfig_ipv6_local = NULL;
+#endif /* !defined(ENABLE_NDM_INTEGRATION) */
         bool do_ipv6 = false;
         struct argv argv = argv_new();
 
@@ -911,7 +913,9 @@ do_ifconfig(struct tuntap *tt,
 
         if (tt->did_ifconfig_ipv6_setup)
         {
+#if !defined(ENABLE_NDM_INTEGRATION)
             ifconfig_ipv6_local = print_in6_addr(tt->local_ipv6, 0, &gc);
+#endif
             do_ipv6 = true;
         }
 
@@ -2238,11 +2242,11 @@ close_tun(struct tuntap *tt)
 
             if (tt->did_ifconfig_ipv6_setup)
             {
-                const char *ifconfig_ipv6_local = print_in6_addr(tt->local_ipv6, 0, &gc);
-
 #if defined(ENABLE_NDM_INTEGRATION)
                 msg(M_INFO, "IPv6 is not supported yet (shutdown)");
 #else /* if defined(ENABLE_NDM_INTEGRATION) */
+                const char *ifconfig_ipv6_local = print_in6_addr(tt->local_ipv6, 0, &gc);
+
 #ifdef ENABLE_IPROUTE
                 argv_printf(&argv, "%s -6 addr del %s/%d dev %s",
                             iproute_path,
