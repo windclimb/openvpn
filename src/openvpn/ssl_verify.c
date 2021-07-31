@@ -1218,7 +1218,9 @@ verify_user_pass_plugin(struct tls_session *session, const struct user_pass *up,
         msg(D_TLS_ERRORS, "TLS Auth Error (verify_user_pass_plugin): peer provided a blank username");
     }
 
+#ifdef PLUGIN_DEF_AUTH
 cleanup:
+#endif
     return retval;
 }
 
