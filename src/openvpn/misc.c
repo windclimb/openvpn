@@ -196,7 +196,9 @@ openvpn_execve(const struct argv *a, const struct env_set *es, const unsigned in
 {
     struct gc_arena gc = gc_new();
     int ret = -1;
+#if defined(ENABLE_FEATURE_EXECVE) && !defined(ENABLE_NDM_INTEGRATION)
     static bool warn_shown = false;
+#endif
 
     if (a && a->argv[0])
     {
