@@ -30,7 +30,7 @@
  * Baseline maximum number of events
  * to wait for.
  */
-#define BASE_N_EVENTS 4
+#define BASE_N_EVENTS 5
 
 void context_clear(struct context *c);
 
@@ -96,6 +96,8 @@ const char *format_common_name(struct context *c, struct gc_arena *gc);
 void reset_coarse_timers(struct context *c);
 
 bool do_deferred_options(struct context *c, const unsigned int found);
+
+bool finish_options(struct context *c);
 
 void inherit_context_child(struct context *dest,
                            const struct context *src);
